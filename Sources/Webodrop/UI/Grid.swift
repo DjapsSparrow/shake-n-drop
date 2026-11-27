@@ -87,8 +87,9 @@ private struct GridProbeModifier: ViewModifier {
     let inset: CGFloat
     @State private var owner = UUID()
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        if GridProbes.enabled {
+        if GridProbes.enabled, #available(macOS 15.0, *) {
             content
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
                     GridProbes.shared.update(.init(kind: kind, name: name, area: area, edge: edge, inset: inset,

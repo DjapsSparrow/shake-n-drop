@@ -86,9 +86,15 @@ struct ShelfView: View {
 
     @ViewBuilder
     private var shelfBackground: some View {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(.ultraThinMaterial)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        if #available(macOS 26.0, *) {
+            shape
+                .fill(.ultraThinMaterial)
+                .glassEffect(.regular, in: shape)
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+        }
     }
 
     // MARK: - En-tête
