@@ -13,6 +13,27 @@ final class UpdateChecker {
         let downloadURL: URL
     }
 
+    struct ReleaseEntry: Identifiable, Sendable {
+        let id: String
+        let version: String
+        let notes: String
+        let formattedDate: String
+
+        var bulletLines: [String] {
+            let lines = notes
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .map { line in
+                    if line.hasPrefix("- ") || line.hasPrefix("• ") || line.hasPrefix("* ") {
+                        return String(line.dropFirst(2))
+                    }
+                    return line
+                }
+            return lines.isEmpty ? ["Améliorations générales et corrections."] : lines
+        }
+    }
+
     nonisolated static let repoSlug = "DjapsSparrow/shake-n-drop"
 
     private(set) var isChecking: Bool = false
@@ -141,6 +162,50 @@ final class UpdateChecker {
     }
 
     // MARK: - Réseau & Extraction (nonisolated)
+
+    nonisolated static func fetchAllReleases() async throws -> [ReleaseEntry] {
+        let url = URL(string: "https://api.github.com/repos/\(repoSlug)/releases?per_page=50")!
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("ShakeNDrop-Updater", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 12
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw NSError(domain: "ShakeNDrop.Update", code: http.statusCode, userInfo: [
+                NSLocalizedDescriptionKey: "Réponse HTTP \(http.statusCode)"
+            ])
+        }
+
+        struct GHReleaseItem: Decodable {
+            let tag_name: String
+            let body: String?
+            let published_at: String?
+        }
+
+        let decoded = try JSONDecoder().decode([GHReleaseItem].self, from: data)
+        let iso = ISO8601DateFormatter()
+        let displayFormatter = DateFormatter()
+        displayFormatter.locale = Locale(identifier: "fr_FR")
+        displayFormatter.dateStyle = .medium
+        displayFormatter.timeStyle = .none
+
+        return decoded.map { item in
+            let cleanVersion = item.tag_name.replacingOccurrences(of: "^v", with: "", options: .regularExpression)
+            let formattedDate: String
+            if let rawDate = item.published_at, let date = iso.date(from: rawDate) {
+                formattedDate = displayFormatter.string(from: date)
+            } else {
+                formattedDate = ""
+            }
+            return ReleaseEntry(
+                id: item.tag_name,
+                version: cleanVersion,
+                notes: item.body ?? "",
+                formattedDate: formattedDate
+            )
+        }
+    }
 
     nonisolated private static func fetchLatestRelease() async throws -> ReleaseInfo {
         let url = URL(string: "https://api.github.com/repos/\(repoSlug)/releases/latest")!

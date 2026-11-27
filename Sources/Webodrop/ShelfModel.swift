@@ -215,6 +215,7 @@ final class WebodropEngine {
     @ObservationIgnored private var settingsWindow: NSWindow?
     @ObservationIgnored private var onboardingWindow: NSWindow?
     @ObservationIgnored private var feedbackWindow: NSWindow?
+    @ObservationIgnored private var changelogWindow: NSWindow?
     @ObservationIgnored let shakeMonitor = ShakeMonitor()
     @ObservationIgnored let hotkey = GlobalHotkey()
     @ObservationIgnored let updater = UpdateChecker()
@@ -384,6 +385,32 @@ final class WebodropEngine {
         window.center()
         windowRef = window
         feedbackWindow = window
+
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func openChangelog() {
+        if let existing = changelogWindow {
+            NSApp.activate()
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        var windowRef: NSWindow?
+        let rootView = ChangelogView(updater: updater) {
+            windowRef?.close()
+        }
+        .themed()
+
+        let controller = NSHostingController(rootView: rootView)
+        let window = NSWindow(contentViewController: controller)
+        window.title = "Historique des versions — Shake'n'Drop"
+        window.styleMask = [.titled, .closable, .resizable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        windowRef = window
+        changelogWindow = window
 
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)

@@ -68,6 +68,14 @@ struct SettingsView: View {
                 }
 
                 HStack {
+                    Text("Historique des versions")
+                    Spacer()
+                    Button("Voir les nouveautés…") {
+                        engine.openChangelog()
+                    }
+                }
+
+                HStack {
                     Text("Guide de démarrage")
                     Spacer()
                     Button("Rouvrir l'assistant") {
