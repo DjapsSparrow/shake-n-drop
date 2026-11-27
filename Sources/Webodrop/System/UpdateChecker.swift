@@ -12,7 +12,7 @@ final class UpdateChecker {
         let downloadURL: URL
     }
 
-    static let repoSlug = "DjapsSparrow/shake-n-drop"
+    nonisolated static let repoSlug = "DjapsSparrow/shake-n-drop"
 
     private(set) var isChecking: Bool = false
     private(set) var isInstalling: Bool = false
