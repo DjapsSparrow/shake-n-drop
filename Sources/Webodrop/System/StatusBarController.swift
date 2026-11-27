@@ -225,8 +225,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         return flags
     }
 
-    /// Dessine le picto monochrome template 18×18 assorti à l'icône Liquid Glass de Shake'n'Drop :
-    /// contour fin aéré + pile de cartes en éventail + berceau d'étagère net.
+    /// Dessine le picto monochrome template 18×18 assorti à l'icône Shake'n'Drop :
+    /// un curseur net au centre encadré de 2 arcs de secousse ultra-lisibles.
     private static func makeMenuBarIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: true) { _ in
@@ -234,57 +234,35 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             ctx.setAllowsAntialiasing(true)
             ctx.setShouldAntialias(true)
 
-            // 1. Cartes arrière en éventail (légères, bien séparées du berceau)
-            ctx.saveGState()
-            ctx.setStrokeColor(NSColor.black.withAlphaComponent(0.55).cgColor)
-            ctx.setLineWidth(1.25)
+            // 1. Arcs de vibration gauche & droite (trait net aux extrémités arrondies)
+            ctx.setStrokeColor(NSColor.black.cgColor)
+            ctx.setLineWidth(1.5)
+            ctx.setLineCap(.round)
 
-            ctx.saveGState()
-            ctx.translateBy(x: 6.4, y: 5.8)
-            ctx.rotate(by: -15 * .pi / 180)
-            ctx.addPath(CGPath(roundedRect: CGRect(x: -2.6, y: -3.0, width: 5.2, height: 5.6), cornerWidth: 1.2, cornerHeight: 1.2, transform: nil))
+            let leftWave = CGMutablePath()
+            leftWave.move(to: CGPoint(x: 3.6, y: 5.2))
+            leftWave.addQuadCurve(to: CGPoint(x: 3.6, y: 12.8), control: CGPoint(x: 1.2, y: 9.0))
+            ctx.addPath(leftWave)
             ctx.strokePath()
-            ctx.restoreGState()
 
-            ctx.saveGState()
-            ctx.translateBy(x: 11.6, y: 5.8)
-            ctx.rotate(by: 15 * .pi / 180)
-            ctx.addPath(CGPath(roundedRect: CGRect(x: -2.6, y: -3.0, width: 5.2, height: 5.6), cornerWidth: 1.2, cornerHeight: 1.2, transform: nil))
+            let rightWave = CGMutablePath()
+            rightWave.move(to: CGPoint(x: 14.4, y: 5.2))
+            rightWave.addQuadCurve(to: CGPoint(x: 14.4, y: 12.8), control: CGPoint(x: 16.8, y: 9.0))
+            ctx.addPath(rightWave)
             ctx.strokePath()
-            ctx.restoreGState()
-            ctx.restoreGState()
 
-            // 2. Carte centrale nette (remplissage doux + contour propre)
-            ctx.setFillColor(NSColor.black.withAlphaComponent(0.85).cgColor)
-            let centerCard = CGPath(roundedRect: CGRect(x: 5.7, y: 2.0, width: 6.6, height: 6.0), cornerWidth: 1.4, cornerHeight: 1.4, transform: nil)
-            ctx.addPath(centerCard)
-            ctx.fillPath()
-
-            // 3. Berceau d'étagère en U arrondi en bas (aéré avec un espace net de 1.8 pt)
+            // 2. Curseur central plein et net
             ctx.setFillColor(NSColor.black.cgColor)
-            let tray = CGMutablePath()
-            tray.move(to: CGPoint(x: 2.9, y: 9.8))
-            tray.addLine(to: CGPoint(x: 5.8, y: 9.8))
-            tray.addCurve(
-                to: CGPoint(x: 9.0, y: 12.1),
-                control1: CGPoint(x: 6.6, y: 9.8),
-                control2: CGPoint(x: 7.4, y: 12.1)
-            )
-            tray.addCurve(
-                to: CGPoint(x: 12.2, y: 9.8),
-                control1: CGPoint(x: 10.6, y: 12.1),
-                control2: CGPoint(x: 11.4, y: 9.8)
-            )
-            tray.addLine(to: CGPoint(x: 15.1, y: 9.8))
-            tray.addQuadCurve(to: CGPoint(x: 16.0, y: 10.7), control: CGPoint(x: 16.0, y: 9.8))
-            tray.addLine(to: CGPoint(x: 16.0, y: 13.6))
-            tray.addQuadCurve(to: CGPoint(x: 13.6, y: 16.0), control: CGPoint(x: 16.0, y: 16.0))
-            tray.addLine(to: CGPoint(x: 4.4, y: 16.0))
-            tray.addQuadCurve(to: CGPoint(x: 2.0, y: 13.6), control: CGPoint(x: 2.0, y: 16.0))
-            tray.addLine(to: CGPoint(x: 2.0, y: 10.7))
-            tray.addQuadCurve(to: CGPoint(x: 2.9, y: 9.8), control: CGPoint(x: 2.0, y: 9.8))
-            tray.closeSubpath()
-            ctx.addPath(tray)
+            let cursor = CGMutablePath()
+            cursor.move(to: CGPoint(x: 6.2, y: 3.2))
+            cursor.addLine(to: CGPoint(x: 13.0, y: 8.6))
+            cursor.addLine(to: CGPoint(x: 9.8, y: 9.3))
+            cursor.addLine(to: CGPoint(x: 11.4, y: 13.6))
+            cursor.addLine(to: CGPoint(x: 9.6, y: 14.3))
+            cursor.addLine(to: CGPoint(x: 8.0, y: 10.0))
+            cursor.addLine(to: CGPoint(x: 6.2, y: 12.1))
+            cursor.closeSubpath()
+            ctx.addPath(cursor)
             ctx.fillPath()
 
             return true

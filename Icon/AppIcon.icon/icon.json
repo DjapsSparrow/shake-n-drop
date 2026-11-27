@@ -5,12 +5,11 @@
   "groups" : [
     {
       "layers" : [
-        { "glass" : true, "image-name" : "front.svg", "name" : "shelf-tray" },
-        { "glass" : true, "image-name" : "mid.svg", "name" : "front-card", "opacity" : 0.88 },
-        { "glass" : true, "image-name" : "back.svg", "name" : "shaken-cards", "opacity" : 0.52 }
+        { "glass" : true, "image-name" : "front.svg", "name" : "cursor" },
+        { "glass" : true, "image-name" : "back.svg", "name" : "shake-waves", "opacity" : 0.68 }
       ],
       "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
-      "translucency" : { "enabled" : true, "value" : 0.55 }
+      "translucency" : { "enabled" : true, "value" : 0.52 }
     }
   ],
   "supported-platforms" : { "squares" : [ "macOS" ] }

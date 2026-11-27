@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect x="272" y="218" width="356" height="320" rx="64" fill="#FFFFFF" transform="rotate(-15 450 378)"/>
-  <rect x="396" y="226" width="356" height="320" rx="64" fill="#FFFFFF" transform="rotate(14 574 386)"/>
+  <!-- 2 arcs de secousse épurés (gauche & droite), bien espacés du curseur -->
+  <path fill="#FFFFFF" d="M236 334 C248 318 270 316 286 328 C302 340 304 362 292 378 C258 422 242 472 242 522 C242 572 258 622 292 666 C304 682 302 704 286 716 C270 728 248 726 236 710 C190 654 168 590 168 522 C168 454 190 390 236 334 Z"/>
+  <path fill="#FFFFFF" d="M812 334 C800 318 778 316 762 328 C746 340 744 362 756 378 C790 422 806 472 806 522 C806 572 790 622 756 666 C744 682 746 704 762 716 C778 728 800 726 812 710 C858 654 880 590 880 522 C880 454 858 390 812 334 Z"/>
 </svg>
