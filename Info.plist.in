@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>com.webomatik.webodrop</string>
-<key>CFBundleName</key><string>Webodrop</string>
-<key>CFBundleDisplayName</key><string>Webodrop</string>
+<key>CFBundleIdentifier</key><string>com.webomatik.shakendrop</string>
+<key>CFBundleName</key><string>Shake'n'Drop</string>
+<key>CFBundleDisplayName</key><string>Shake'n'Drop</string>
 <key>CFBundleExecutable</key><string>Webodrop</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleIconName</key><string>AppIcon</string>
@@ -18,9 +18,10 @@
 <key>CFBundleURLTypes</key>
 <array>
   <dict>
-    <key>CFBundleURLName</key><string>com.webomatik.webodrop</string>
+    <key>CFBundleURLName</key><string>com.webomatik.shakendrop</string>
     <key>CFBundleURLSchemes</key>
     <array>
+      <string>shakendrop</string>
       <string>webodrop</string>
     </array>
   </dict>

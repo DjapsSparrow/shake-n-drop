@@ -9,6 +9,7 @@
 set -euo pipefail
 here=${0:A:h}
 name="Webodrop"
+app_name="Shake'n'Drop"
 scratch="$HOME/Library/Developer/$name/build"
 config=release
 [[ " $* " == *" --debug "* ]] && config=debug
@@ -37,8 +38,8 @@ if [[ -n "$stale" ]]; then
   exit 1
 fi
 
-app="$HOME/Applications/$name.app"
-mkdir -p "$HOME/Applications"
+app="/Applications/$app_name.app"
+rm -rf "$HOME/Applications/$name.app" "$HOME/Applications/$app_name.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/$name"
@@ -53,9 +54,11 @@ if [[ -d "$here/Icon/AppIcon.icon" ]]; then
 fi
 xattr -cr "$app"
 codesign --force --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R -trusted "$app" >/dev/null 2>&1 || true
 echo "installed $app (signed: ${identity})"
 
 if [[ " $* " == *" --open "* ]]; then
+  osascript -e "quit app \"$app_name\"" 2>/dev/null || true
   osascript -e "quit app \"$name\"" 2>/dev/null || true
   sleep 0.5
   open "$app"

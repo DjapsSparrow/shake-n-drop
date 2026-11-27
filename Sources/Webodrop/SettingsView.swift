@@ -40,7 +40,7 @@ struct SettingsView: View {
                 Toggle("Fermer automatiquement l'étagère après dépôt", isOn: $engine.autoCloseAfterDragOut)
                 Toggle("Replier la liste en cliquant en dehors", isOn: $engine.collapseListOnOutsideClick)
                 Toggle("Afficher l'icône dans le Dock", isOn: $engine.showInDock)
-                Toggle("Lancer Webodrop à l'ouverture de session", isOn: Binding(
+                Toggle("Lancer Shake'n'Drop à l'ouverture de session", isOn: Binding(
                     get: { engine.launchAtLogin },
                     set: { engine.setLaunchAtLogin($0) }
                 ))

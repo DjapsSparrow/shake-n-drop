@@ -21,11 +21,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
 
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: "Webodrop")
+            let image = NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: "Shake'n'Drop")
             image?.isTemplate = true
             button.image = image
             button.imagePosition = .imageLeading
-            button.toolTip = "Webodrop — Glissez des fichiers ici ou cliquez"
+            button.toolTip = "Shake'n'Drop — Glissez des fichiers ici ou cliquez"
 
             let overlay = StatusBarDropView(frame: button.bounds)
             overlay.autoresizingMask = [.width, .height]
@@ -113,7 +113,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         settings.target = self
         menu.addItem(settings)
 
-        let quit = NSMenuItem(title: "Quitter Webodrop", action: #selector(quitApp), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quitter Shake'n'Drop", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
     }

@@ -1,6 +1,6 @@
-# NOTES — Webodrop (macOS Swift 6 Natif)
+# NOTES — Shake'n'Drop (ex-Webodrop, macOS Swift 6 Natif)
 
-- **Statut :** ✅ V1 fonctionnelle, compilée en Release, testée et installée dans `~/Applications/Webodrop.app`
+- **Statut :** ✅ V1 fonctionnelle, compilée en Release, testée, installée dans `/Applications/Shake'n'Drop.app` et épinglée au Dock.
 - **Stack :** Swift 6.4 (strict concurrency, `defaultIsolation(MainActor.self)`), SwiftUI, AppKit (`NSPanel`, `NSStatusItem`, `NSDraggingSource`/`Destination`), Carbon (`RegisterEventHotKey`), QuickLook (`QLPreviewPanel` + `QLThumbnailGenerator`).
 - **Brief :** [`docs/BRIEF.md`](docs/BRIEF.md)
 

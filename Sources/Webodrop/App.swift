@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         let engine = WebodropEngine.shared
         for url in urls {
-            guard url.scheme?.lowercased() == "webodrop" else { continue }
+            guard let scheme = url.scheme?.lowercased(), scheme == "shakendrop" || scheme == "webodrop" else { continue }
             let action = url.lastPathComponent.lowercased()
             switch action {
             case "new-shelf", "new":

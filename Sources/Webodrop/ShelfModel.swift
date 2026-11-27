@@ -742,7 +742,7 @@ final class WebodropEngine {
         try fm.createDirectory(at: outDir, withIntermediateDirectories: true)
         let baseName = urls.count == 1
             ? urls[0].deletingPathExtension().lastPathComponent
-            : "Webodrop-\(urls.count)-elements"
+            : "ShakeNDrop-\(urls.count)-elements"
         let archiveURL = outDir.appending(path: "\(baseName)-\(Int(Date.now.timeIntervalSince1970)).zip")
 
         let process = Process()
