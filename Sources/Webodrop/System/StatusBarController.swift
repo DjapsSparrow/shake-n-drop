@@ -21,8 +21,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
 
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: "Shake'n'Drop")
-            image?.isTemplate = true
+            let image = Self.makeMenuBarIcon()
+            image.isTemplate = true
             button.image = image
             button.imagePosition = .imageLeading
             button.toolTip = "Shake'n'Drop — Glissez des fichiers ici ou cliquez"
@@ -146,6 +146,78 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func quitApp() {
         NSApp.terminate(nil)
+    }
+
+    /// Dessine le picto monochrome template 18×18 assorti à l'icône Liquid Glass de Shake'n'Drop :
+    /// pile de cartes en éventail + berceau d'étagère en U arrondi.
+    private static func makeMenuBarIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: true) { _ in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.setAllowsAntialiasing(true)
+            ctx.setShouldAntialias(true)
+
+            // 1. Cartes arrière en éventail (opacité légère pour la profondeur en template)
+            ctx.saveGState()
+            ctx.setFillColor(NSColor.black.withAlphaComponent(0.45).cgColor)
+
+            // Carte gauche inclinée (-15°)
+            ctx.saveGState()
+            ctx.translateBy(x: 6.8, y: 6.2)
+            ctx.rotate(by: -15 * .pi / 180)
+            let leftCard = CGPath(roundedRect: CGRect(x: -3.2, y: -3.4, width: 6.4, height: 6.8), cornerWidth: 1.4, cornerHeight: 1.4, transform: nil)
+            ctx.addPath(leftCard)
+            ctx.fillPath()
+            ctx.restoreGState()
+
+            // Carte droite inclinée (+15°)
+            ctx.saveGState()
+            ctx.translateBy(x: 11.2, y: 6.2)
+            ctx.rotate(by: 15 * .pi / 180)
+            let rightCard = CGPath(roundedRect: CGRect(x: -3.2, y: -3.4, width: 6.4, height: 6.8), cornerWidth: 1.4, cornerHeight: 1.4, transform: nil)
+            ctx.addPath(rightCard)
+            ctx.fillPath()
+            ctx.restoreGState()
+            ctx.restoreGState()
+
+            // 2. Carte centrale principale
+            ctx.setFillColor(NSColor.black.withAlphaComponent(0.82).cgColor)
+            let centerCard = CGPath(roundedRect: CGRect(x: 5.4, y: 2.0, width: 7.2, height: 6.8), cornerWidth: 1.6, cornerHeight: 1.6, transform: nil)
+            ctx.addPath(centerCard)
+            ctx.fillPath()
+
+            // 3. Berceau d'étagère en U arrondi devant (silhouette identique à front.svg)
+            ctx.setFillColor(NSColor.black.cgColor)
+            let tray = CGMutablePath()
+            tray.move(to: CGPoint(x: 3.0, y: 9.6))
+            tray.addLine(to: CGPoint(x: 5.7, y: 9.6))
+            tray.addCurve(
+                to: CGPoint(x: 9.0, y: 12.1),
+                control1: CGPoint(x: 6.6, y: 9.6),
+                control2: CGPoint(x: 7.4, y: 12.1)
+            )
+            tray.addCurve(
+                to: CGPoint(x: 12.3, y: 9.6),
+                control1: CGPoint(x: 10.6, y: 12.1),
+                control2: CGPoint(x: 11.4, y: 9.6)
+            )
+            tray.addLine(to: CGPoint(x: 15.0, y: 9.6))
+            tray.addQuadCurve(to: CGPoint(x: 16.0, y: 10.6), control: CGPoint(x: 16.0, y: 9.6))
+            tray.addLine(to: CGPoint(x: 16.0, y: 13.4))
+            tray.addQuadCurve(to: CGPoint(x: 13.4, y: 16.0), control: CGPoint(x: 16.0, y: 16.0))
+            tray.addLine(to: CGPoint(x: 4.6, y: 16.0))
+            tray.addQuadCurve(to: CGPoint(x: 2.0, y: 13.4), control: CGPoint(x: 2.0, y: 16.0))
+            tray.addLine(to: CGPoint(x: 2.0, y: 10.6))
+            tray.addQuadCurve(to: CGPoint(x: 3.0, y: 9.6), control: CGPoint(x: 2.0, y: 9.6))
+            tray.closeSubpath()
+            ctx.addPath(tray)
+            ctx.fillPath()
+
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Shake'n'Drop"
+        return image
     }
 }
 
