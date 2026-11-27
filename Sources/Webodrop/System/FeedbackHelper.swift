@@ -13,7 +13,7 @@ enum FeedbackHelper {
 
         var id: String { rawValue }
 
-        var title: String {
+        nonisolated var title: String {
             switch self {
             case .idea: "Idée d'amélioration"
             case .bug: "Signaler un bug"
