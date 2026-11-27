@@ -1,64 +1,115 @@
 import SwiftUI
+import WebodropKit
 
-/// The Settings window (Command-Comma). One tab per topic, at most about
-/// six. Each tab is a grouped Form that sizes to its content, so the
-/// window grows to fit and shows no scroll bar it does not need.
 struct SettingsView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(WebodropEngine.self) private var engine
 
     var body: some View {
-        @Bindable var model = model
-        TabView(selection: $model.settingsTab) {
-            ForEach(SettingsTab.allCases) { tab in
-                page(tab)
-                    .tabItem { Label(tab.title, systemImage: tab.symbol) }
-                    .tag(tab)
-            }
+        @Bindable var engine = engine
+        TabView(selection: $engine.settingsTab) {
+            generalTab
+                .tag(SettingsTab.general)
+                .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.symbol) }
+
+            shortcutTab
+                .tag(SettingsTab.shortcut)
+                .tabItem { Label(SettingsTab.shortcut.title, systemImage: SettingsTab.shortcut.symbol) }
+
+            appearanceTab
+                .tag(SettingsTab.appearance)
+                .tabItem { Label(SettingsTab.appearance.title, systemImage: SettingsTab.appearance.symbol) }
         }
-        .noInitialFocus()
+        .frame(width: 460)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
-    @ViewBuilder
-    private func page(_ tab: SettingsTab) -> some View {
-        Form {
-            switch tab {
-            case .general: GeneralSettings()
-            case .appearance: AppearanceSettings()
+    private var generalTab: some View {
+        @Bindable var engine = engine
+        return Form {
+            Section("Déclenchement (Shake-to-trigger)") {
+                Toggle("Secouer le curseur pendant un glisser-déposer", isOn: $engine.shakeEnabled)
+                Picker("Sensibilité de la secousse", selection: $engine.shakeSensitivity) {
+                    ForEach(ShakeSensitivity.allCases) { level in
+                        Text(level.label).tag(level)
+                    }
+                }
+                .disabled(!engine.shakeEnabled)
+            }
+
+            Section("Comportement des étagères") {
+                Toggle("Fermer automatiquement l'étagère après dépôt", isOn: $engine.autoCloseAfterDragOut)
+                Toggle("Afficher l'icône dans le Dock", isOn: $engine.showInDock)
+                Toggle("Lancer Webodrop à l'ouverture de session", isOn: Binding(
+                    get: { engine.launchAtLogin },
+                    set: { engine.setLaunchAtLogin($0) }
+                ))
+            }
+
+            Section("Autorisation Système (Accessibilité)") {
+                HStack {
+                    Label(
+                        engine.permissions.accessibilityGranted ? "Autorisée" : "Recommandée pour le Shake global",
+                        systemImage: engine.permissions.accessibilityGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(engine.permissions.accessibilityGranted ? .green : .orange)
+                    Spacer()
+                    if !engine.permissions.accessibilityGranted {
+                        Button("Ouvrir Réglages Système") {
+                            engine.permissions.openAccessibilitySettings()
+                        }
+                    }
+                }
+                Text("Permet de détecter la secousse du curseur depuis toutes vos applications. Le raccourci global et la barre de menu fonctionnent sans aucune autorisation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .fitsContent()
-        .frame(width: 520)
-    }
-}
-
-/// The Settings tabs. Snapshot mode walks through every case.
-enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, appearance
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .general: "General"
-        case .appearance: "Appearance"
+        .onAppear {
+            engine.permissions.refresh()
         }
     }
 
-    var symbol: String {
-        switch self {
-        case .general: "gearshape"
-        case .appearance: "paintpalette"
+    private var shortcutTab: some View {
+        @Bindable var engine = engine
+        return Form {
+            Section("Raccourci clavier global") {
+                Picker("Combinaison", selection: $engine.shortcut) {
+                    ForEach(ShortcutConfig.presets, id: \.displayLabel) { preset in
+                        Text(preset.displayLabel).tag(preset)
+                    }
+                }
+
+                LabeledContent("Statut") {
+                    Label(
+                        engine.hotkeyStatusMessage,
+                        systemImage: engine.hotkeyRegistered ? "checkmark.circle.fill" : "xmark.circle.fill"
+                    )
+                    .foregroundStyle(engine.hotkeyRegistered ? .green : .red)
+                }
+            }
+
+            Section("Test rapide") {
+                HStack {
+                    Text("Ouvrir une étagère flottante maintenant")
+                    Spacer()
+                    Button("Nouvelle étagère") {
+                        engine.summonShelfNearCursor(reuseEmpty: false)
+                    }
+                }
+            }
         }
+        .formStyle(.grouped)
     }
-}
 
-struct GeneralSettings: View {
-    @AppStorage("confirmDelete") private var confirmDelete = true
-
-    var body: some View {
-        Section("Items") {
-            Toggle("Ask before deleting items", isOn: $confirmDelete)
+    private var appearanceTab: some View {
+        @Bindable var engine = engine
+        return Form {
+            Section("Format") {
+                Toggle("Étagères compactes", isOn: $engine.compactMode)
+            }
+            AppearanceSettings()
         }
+        .formStyle(.grouped)
     }
 }

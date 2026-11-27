@@ -1,45 +1,24 @@
 import AppKit
-import SwiftData
 import SwiftUI
 
-// Webodrop
-//   Webodrop                      the app
-//   APP_STORE=<file> Webodrop     use another database (tests, experiments)
-//   APP_SNAPSHOT=<dir> Webodrop   save a PNG of every sidebar page and Settings tab in light and dark mode, then quit
-//   APP_SEED=1 Webodrop           fill an empty /tmp store with sample items (tools/snap.sh)
-//   Webodrop --selftest           run the self-test on a /tmp store and quit with 0 or 1 (tools/selftest.sh)
-//   APP_ACCENT=<id> Webodrop      run with another accent from Theme.all (UI/Theme.swift)
-//   APP_GRID=1 Webodrop           draw the 8 pt grid and the layout probes over the window
+// Webodrop — Mini-app macOS native d'étagères flottantes façon Dropover.
+//   Webodrop                        lance l'app barre de menu
+//   APP_SNAPSHOT=<dir> Webodrop     capture les étagères (vide, pile, liste) et Réglages en Light & Dark puis quitte
+//   Webodrop --selftest             exécute l'auto-test interne et quitte avec 0 ou 1
 
 @main
 struct WebodropApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var model = AppModel(container: Store.makeContainer())
+    @Environment(\.openSettings) private var openSettings
 
     var body: some Scene {
-        Window("Webodrop", id: "main") {
-            ContentView()
-                .environment(model)
-                .themed()
-                .overlay { if GridOverlay.enabled { GridOverlay() } }
-                .frame(minWidth: 760, minHeight: 480)
-        }
-        .modelContainer(model.container)
-        .defaultSize(width: 1100, height: 720)
-        .windowToolbarStyle(.unified)
-        .commands {
-            SidebarCommands()
-            ToolbarCommands()
-            CommandGroup(replacing: .newItem) {
-                Button("New Item") { model.addItem() }
-                    .keyboardShortcut("n")
-            }
-        }
-
         Settings {
             SettingsView()
-                .environment(model)
+                .environment(WebodropEngine.shared)
                 .themed()
+                .onAppear {
+                    WebodropEngine.shared.openSettingsAction = { openSettings() }
+                }
         }
         .windowResizability(.contentSize)
     }
@@ -47,40 +26,60 @@ struct WebodropApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Started from a terminal, the process is not a foreground app yet.
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
-    }
+        let engine = WebodropEngine.shared
+        engine.start()
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
-
-    /// The self-test's result becomes the exit code, after a normal quit.
-    func applicationWillTerminate(_ notification: Notification) {
-        if SelfTest.requested { exit(SelfTest.exitCode) }
-    }
-}
-
-/// Where the data lives: ~/Library/Application Support/Webodrop/Webodrop.store
-enum Store {
-    /// True when APP_STORE points somewhere else (tests, snapshots, seed data).
-    static var isOverridden: Bool {
-        !(ProcessInfo.processInfo.environment["APP_STORE"] ?? "").isEmpty
-    }
-
-    static var url: URL {
-        if let path = ProcessInfo.processInfo.environment["APP_STORE"], !path.isEmpty {
-            return URL(fileURLWithPath: path)
+        if SelfTest.requested {
+            SelfTest.run(engine: engine)
+            return
         }
-        let dir = URL.applicationSupportDirectory.appending(path: "Webodrop", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "Webodrop.store")
+
+        if Snapshot.requested {
+            Snapshot.run(engine: engine)
+            return
+        }
+
+        // Ouvre une première étagère accueillante au lancement manuel pour un retour visuel immédiat.
+        if engine.shelves.isEmpty {
+            engine.summonShelfNearCursor(reuseEmpty: false)
+        }
     }
 
-    static func makeContainer() -> ModelContainer {
-        do {
-            return try ModelContainer(for: Item.self, configurations: ModelConfiguration(url: url))
-        } catch {
-            fatalError("Could not open the database at \(url.path): \(error)")
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Application barre de menu : reste active en arrière-plan même sans étagère ouverte.
+        false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            WebodropEngine.shared.summonShelfNearCursor(reuseEmpty: true)
+        }
+        return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let engine = WebodropEngine.shared
+        for url in urls {
+            guard url.scheme?.lowercased() == "webodrop" else { continue }
+            let action = url.lastPathComponent.lowercased()
+            switch action {
+            case "new-shelf", "new":
+                engine.summonShelfNearCursor(reuseEmpty: false)
+            case "close-all", "clear":
+                engine.closeAllShelves()
+            case "settings":
+                engine.openSettings()
+            default:
+                break
+            }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        WebodropEngine.shared.shakeMonitor.stop()
+        WebodropEngine.shared.hotkey.unregister()
+        if SelfTest.requested {
+            exit(SelfTest.exitCode)
         }
     }
 }
