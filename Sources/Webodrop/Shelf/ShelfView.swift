@@ -32,7 +32,7 @@ struct ShelfView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(
-                    shelf.isDropTargeted ? Color.accentColor : Color.primary.opacity(0.14),
+                    shelf.isDropTargeted ? Palette.accent : Color.primary.opacity(0.14),
                     lineWidth: shelf.isDropTargeted ? 2.5 : 1
                 )
         }
@@ -65,9 +65,9 @@ struct ShelfView: View {
                     Text("\(shelf.items.count)")
                         .font(.caption2.weight(.bold))
                         .monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Palette.onAccent)
                         .frame(width: 20, height: 20)
-                        .background(Circle().fill(Color.accentColor))
+                        .background(Circle().fill(Palette.accent))
                 } else {
                     Image(systemName: "tray.and.arrow.down")
                         .font(.system(size: 11, weight: .semibold))
@@ -103,7 +103,7 @@ struct ShelfView: View {
                 } label: {
                     Image(systemName: shelf.isPinned ? "pin.fill" : "pin")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(shelf.isPinned ? Color.accentColor : .secondary)
+                        .foregroundStyle(shelf.isPinned ? Palette.accent : .secondary)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
@@ -157,18 +157,18 @@ struct ShelfView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(
-                            shelf.isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.32),
+                            shelf.isDropTargeted ? Palette.accent : Color.secondary.opacity(0.32),
                             style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
                         )
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(shelf.isDropTargeted ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.03))
+                                .fill(shelf.isDropTargeted ? Palette.accent.opacity(0.12) : Color.primary.opacity(0.03))
                         )
 
                     VStack(spacing: Space.xs) {
                         Image(systemName: shelf.isDropTargeted ? "plus.circle.fill" : "tray.and.arrow.down")
                             .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(shelf.isDropTargeted ? Color.accentColor : .secondary)
+                            .foregroundStyle(shelf.isDropTargeted ? Palette.accent : .secondary)
                             .symbolEffect(.bounce, value: shelf.isDropTargeted)
 
                         Text(shelf.isDropTargeted ? "Relâchez ici" : "Déposez ici")
@@ -253,10 +253,10 @@ struct ShelfView: View {
                 Text("\(shelf.items.count)")
                     .font(.caption2.weight(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Palette.onAccent)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.accentColor))
+                    .background(Capsule().fill(Palette.accent))
                     .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
                     .offset(x: 6, y: -4)
             }
@@ -272,7 +272,7 @@ struct ShelfView: View {
             } else {
                 Image(systemName: item.kind.symbolName)
                     .font(.system(size: 32))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Palette.accent)
             }
         }
         .frame(width: 64, height: 64)
@@ -314,7 +314,7 @@ struct ShelfView: View {
                                 .aspectRatio(contentMode: .fit)
                         } else {
                             Image(systemName: item.kind.symbolName)
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(Palette.accent)
                         }
                     }
                     .frame(width: 28, height: 28)
