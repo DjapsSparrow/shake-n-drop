@@ -212,6 +212,7 @@ final class WebodropEngine {
 
     @ObservationIgnored var panels: [UUID: ShelfPanel] = [:]
     @ObservationIgnored private var settingsWindow: NSWindow?
+    @ObservationIgnored private var onboardingWindow: NSWindow?
     @ObservationIgnored let shakeMonitor = ShakeMonitor()
     @ObservationIgnored let hotkey = GlobalHotkey()
     @ObservationIgnored let permissions = PermissionMonitor()
@@ -226,6 +227,15 @@ final class WebodropEngine {
         static let showInDock = "webodrop.showInDock"
         static let compactMode = "webodrop.compactMode"
         static let shortcut = "webodrop.shortcut"
+        static let hasCompletedOnboarding = "shakendrop.hasCompletedOnboarding"
+    }
+
+    var hasCompletedOnboarding: Bool {
+        UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
+    }
+
+    func markOnboardingCompleted() {
+        UserDefaults.standard.set(true, forKey: Keys.hasCompletedOnboarding)
     }
 
     private init() {
@@ -322,6 +332,33 @@ final class WebodropEngine {
         window.isReleasedWhenClosed = false
         window.center()
         settingsWindow = window
+
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func openOnboarding() {
+        if let existing = onboardingWindow {
+            NSApp.activate()
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        var windowRef: NSWindow?
+        let rootView = OnboardingView {
+            windowRef?.close()
+        }
+        .environment(self)
+        .themed()
+
+        let controller = NSHostingController(rootView: rootView)
+        let window = NSWindow(contentViewController: controller)
+        window.title = "Démarrer avec Shake'n'Drop"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        windowRef = window
+        onboardingWindow = window
 
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)

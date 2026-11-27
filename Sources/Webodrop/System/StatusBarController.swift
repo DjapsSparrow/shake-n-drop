@@ -113,6 +113,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         settings.target = self
         menu.addItem(settings)
 
+        let guide = NSMenuItem(title: "Guide de démarrage…", action: #selector(openOnboarding), keyEquivalent: "")
+        guide.target = self
+        menu.addItem(guide)
+
         let updateTitle = if let update = engine.updater.availableUpdate {
             "Mettre à jour vers v\(update.version)…"
         } else {
@@ -121,6 +125,20 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let checkUpdates = NSMenuItem(title: updateTitle, action: #selector(checkForUpdates), keyEquivalent: "")
         checkUpdates.target = self
         menu.addItem(checkUpdates)
+
+        let feedbackMenu = NSMenu()
+        let suggestIdea = NSMenuItem(title: "Suggérer une idée…", action: #selector(sendIdea), keyEquivalent: "")
+        suggestIdea.target = self
+        feedbackMenu.addItem(suggestIdea)
+        let reportBug = NSMenuItem(title: "Signaler un bug…", action: #selector(reportBug), keyEquivalent: "")
+        reportBug.target = self
+        feedbackMenu.addItem(reportBug)
+
+        let feedbackItem = NSMenuItem(title: "Idée ou bug ?", action: nil, keyEquivalent: "")
+        feedbackItem.submenu = feedbackMenu
+        menu.addItem(feedbackItem)
+
+        menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "Quitter Shake'n'Drop", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
@@ -151,6 +169,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() {
         engine?.openSettings()
+    }
+
+    @objc private func openOnboarding() {
+        engine?.openOnboarding()
+    }
+
+    @objc private func sendIdea() {
+        FeedbackHelper.openEmail(kind: .idea, appVersion: engine?.updater.currentVersion ?? "1.0.0")
+    }
+
+    @objc private func reportBug() {
+        FeedbackHelper.openEmail(kind: .bug, appVersion: engine?.updater.currentVersion ?? "1.0.0")
     }
 
     @objc private func checkForUpdates() {

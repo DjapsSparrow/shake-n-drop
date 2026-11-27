@@ -85,6 +85,21 @@ struct SettingsView: View {
                     .disabled(engine.updater.isChecking || engine.updater.isInstalling)
                 }
             }
+
+            Section("Support & Idées") {
+                HStack {
+                    Button("Suggérer une idée", systemImage: "lightbulb") {
+                        FeedbackHelper.openEmail(kind: .idea, appVersion: engine.updater.currentVersion)
+                    }
+                    Spacer()
+                    Button("Signaler un bug", systemImage: "ladybug") {
+                        FeedbackHelper.openEmail(kind: .bug, appVersion: engine.updater.currentVersion)
+                    }
+                }
+                Text("Envoie un email pré-rempli à \(FeedbackHelper.supportEmail) avec votre version de macOS.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear {

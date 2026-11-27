@@ -35,8 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Ouvre une première étagère accueillante au lancement manuel pour un retour visuel immédiat.
-        if engine.shelves.isEmpty {
+        // Au tout premier lancement, affiche le guide rapide ; sinon ouvre une étagère prête.
+        if !engine.hasCompletedOnboarding {
+            engine.openOnboarding()
+        } else if engine.shelves.isEmpty {
             engine.summonShelfNearCursor(reuseEmpty: false)
         }
     }
