@@ -62,6 +62,12 @@ final class ShelfItem: Identifiable {
     }
 }
 
+/// Bord d'écran sur lequel une étagère peut être aimantée/repliée.
+enum DockEdge: String, Sendable {
+    case left
+    case right
+}
+
 /// Une étagère flottante temporaire.
 @Observable
 final class Shelf: Identifiable {
@@ -72,11 +78,20 @@ final class Shelf: Identifiable {
     var isDropTargeted: Bool = false
     var isBusy: Bool = false
     var statusMessage: String?
+    var dockedEdge: DockEdge? = nil
+    var isEdgePeeked: Bool = false
+    var summonedByShake: Bool = false
     let createdAt: Date = .now
 
-    init(id: UUID = UUID(), items: [ShelfItem] = []) {
+    init(id: UUID = UUID(), items: [ShelfItem] = [], summonedByShake: Bool = false) {
         self.id = id
         self.items = items
+        self.summonedByShake = summonedByShake
+    }
+
+    /// True lorsque l'étagère est rangée en languette discrète contre le bord de l'écran.
+    var isDockedCollapsed: Bool {
+        dockedEdge != nil && !isEdgePeeked && !isDropTargeted
     }
 
     var totalBytes: Int64 {
@@ -152,6 +167,12 @@ final class WebodropEngine {
         didSet { UserDefaults.standard.set(autoCloseAfterDragOut, forKey: Keys.autoCloseAfterDragOut) }
     }
 
+    var collapseListOnOutsideClick: Bool {
+        didSet { UserDefaults.standard.set(collapseListOnOutsideClick, forKey: Keys.collapseListOnOutsideClick) }
+    }
+
+    var shelvesHidden: Bool = false
+
     var showInDock: Bool {
         didSet {
             UserDefaults.standard.set(showInDock, forKey: Keys.showInDock)
@@ -200,6 +221,7 @@ final class WebodropEngine {
         static let shakeEnabled = "webodrop.shakeEnabled"
         static let shakeSensitivity = "webodrop.shakeSensitivity"
         static let autoCloseAfterDragOut = "webodrop.autoCloseAfterDragOut"
+        static let collapseListOnOutsideClick = "webodrop.collapseListOnOutsideClick"
         static let showInDock = "webodrop.showInDock"
         static let compactMode = "webodrop.compactMode"
         static let shortcut = "webodrop.shortcut"
@@ -211,6 +233,7 @@ final class WebodropEngine {
             Keys.shakeEnabled: true,
             Keys.shakeSensitivity: ShakeSensitivity.medium.rawValue,
             Keys.autoCloseAfterDragOut: true,
+            Keys.collapseListOnOutsideClick: true,
             Keys.showInDock: false,
             Keys.compactMode: false,
         ])
@@ -218,6 +241,7 @@ final class WebodropEngine {
         self.shakeEnabled = defaults.bool(forKey: Keys.shakeEnabled)
         self.shakeSensitivity = ShakeSensitivity(rawValue: defaults.string(forKey: Keys.shakeSensitivity) ?? "") ?? .medium
         self.autoCloseAfterDragOut = defaults.bool(forKey: Keys.autoCloseAfterDragOut)
+        self.collapseListOnOutsideClick = defaults.bool(forKey: Keys.collapseListOnOutsideClick)
         self.showInDock = defaults.bool(forKey: Keys.showInDock)
         self.compactMode = defaults.bool(forKey: Keys.compactMode)
 
@@ -237,7 +261,13 @@ final class WebodropEngine {
         shakeMonitor.sensitivity = shakeSensitivity
         shakeMonitor.isEnabled = shakeEnabled
         shakeMonitor.onShakeDetected = { [weak self] cursorPoint in
-            self?.summonShelf(near: cursorPoint, reuseEmpty: true)
+            self?.summonShelf(near: cursorPoint, reuseEmpty: true, summonedByShake: true)
+        }
+        shakeMonitor.onGlobalClick = { [weak self] screenPoint in
+            self?.handleGlobalClick(at: screenPoint)
+        }
+        shakeMonitor.onGlobalMouseUp = { [weak self] in
+            self?.handleGlobalMouseUp()
         }
         shakeMonitor.start()
 
@@ -287,16 +317,28 @@ final class WebodropEngine {
     }
 
     @discardableResult
-    func summonShelf(near screenPoint: NSPoint, reuseEmpty: Bool = false, initialItems: [ShelfItem] = []) -> Shelf {
-        // Si déclenché par shake et qu'une étagère vide existe déjà tout près, on la ramène au curseur.
+    func summonShelf(
+        near screenPoint: NSPoint,
+        reuseEmpty: Bool = false,
+        initialItems: [ShelfItem] = [],
+        summonedByShake: Bool = false
+    ) -> Shelf {
+        if shelvesHidden {
+            setShelvesHidden(false)
+        }
+
+        // Si déclenché par shake et qu'une étagère vide existe déjà, on la ramène au curseur.
         if reuseEmpty, initialItems.isEmpty, let emptyShelf = shelves.first(where: { $0.items.isEmpty && !$0.isPinned }),
            let panel = panels[emptyShelf.id] {
+            emptyShelf.dockedEdge = nil
+            emptyShelf.isEdgePeeked = false
+            emptyShelf.summonedByShake = summonedByShake
             panel.position(near: screenPoint)
             panel.orderFrontRegardless()
             return emptyShelf
         }
 
-        let shelf = Shelf(items: initialItems)
+        let shelf = Shelf(items: initialItems, summonedByShake: summonedByShake)
         shelves.append(shelf)
 
         let panel = ShelfPanel(shelf: shelf, engine: self, compact: compactMode)
@@ -310,6 +352,69 @@ final class WebodropEngine {
 
         statusBar?.refresh()
         return shelf
+    }
+
+    func toggleHideAllShelves() {
+        setShelvesHidden(!shelvesHidden)
+    }
+
+    func setShelvesHidden(_ hidden: Bool) {
+        shelvesHidden = hidden
+        for shelf in shelves {
+            guard let panel = panels[shelf.id] else { continue }
+            if hidden {
+                panel.orderOut(nil)
+            } else {
+                panel.orderFrontRegardless()
+            }
+        }
+        statusBar?.refresh()
+    }
+
+    /// Comportement exact de Dropover lorsqu'on clique dans une autre app :
+    /// - Les étagères vides (non épinglées) se ferment automatiquement.
+    /// - Les étagères étendues en Liste se replient en Pile (si activé dans Réglages).
+    func handleGlobalClick(at screenPoint: NSPoint) {
+        guard !shelvesHidden else { return }
+        let now = Date.now
+
+        for shelf in shelves {
+            guard let panel = panels[shelf.id] else { continue }
+            if panel.frame.contains(screenPoint) { continue }
+
+            // Étagère vide : auto-fermeture après un court délai de grâce (0.45s après création)
+            if shelf.items.isEmpty && !shelf.isPinned && now.timeIntervalSince(shelf.createdAt) > 0.45 {
+                closeShelf(shelf)
+                continue
+            }
+
+            // Étagère en liste détaillée : repli automatique en Pile
+            if shelf.isExpanded && collapseListOnOutsideClick {
+                shelf.isExpanded = false
+                panel.updateSize(for: shelf, compact: compactMode)
+            }
+        }
+    }
+
+    /// Lorsqu'on relâche un drag dans une autre app sans rien avoir déposé sur une étagère invoquée par Shake :
+    /// on lui laisse 1.5s de grâce, puis elle disparaît si elle est toujours vide.
+    func handleGlobalMouseUp() {
+        let candidates = shelves.filter { $0.items.isEmpty && !$0.isPinned && $0.summonedByShake }
+        guard !candidates.isEmpty else { return }
+        for shelf in candidates {
+            let id = shelf.id
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                guard let current = self.shelves.first(where: { $0.id == id }),
+                      current.items.isEmpty,
+                      !current.isPinned,
+                      !current.isDropTargeted else { return }
+                if let panel = self.panels[id], panel.frame.contains(NSEvent.mouseLocation) {
+                    return
+                }
+                self.closeShelf(current)
+            }
+        }
     }
 
     func closeShelf(_ shelf: Shelf) {

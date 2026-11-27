@@ -8,6 +8,10 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
     let shelf: Shelf
     private weak var engine: WebodropEngine?
     private var quickLookIndex: Int = 0
+    private var collapseTask: Task<Void, Never>?
+
+    private static let edgeSnapThreshold: CGFloat = 28
+    private static let dockedVisibleWidth: CGFloat = 32
 
     init(shelf: Shelf, engine: WebodropEngine, compact: Bool) {
         self.shelf = shelf
@@ -78,13 +82,95 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         // Garde le bord supérieur fixe lors du déploiement vers le bas.
         let topY = frame.maxY
         let newOrigin = NSPoint(x: frame.origin.x, y: topY - newSize.height)
-        let targetRect = clampedToScreen(NSRect(origin: newOrigin, size: newSize))
+        let targetRect: NSRect
+        if let edge = shelf.dockedEdge {
+            targetRect = dockedFrame(for: edge, size: newSize, peeked: shelf.isEdgePeeked || shelf.isDropTargeted, currentY: newOrigin.y)
+        } else {
+            targetRect = clampedToScreen(NSRect(origin: newOrigin, size: newSize))
+        }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             animator().setFrame(targetRect, display: true)
         }
         contentView?.frame = NSRect(origin: .zero, size: newSize)
+    }
+
+    /// Appelé juste après `performDrag(with:)` : aimante l'étagère au bord gauche/droit si elle en est proche.
+    func handleWindowDragFinished() {
+        let currentScreen = screen ?? NSScreen.main
+        guard let visible = currentScreen?.visibleFrame else { return }
+
+        let distLeft = abs(frame.minX - visible.minX)
+        let distRight = abs(visible.maxX - frame.maxX)
+
+        if distLeft <= Self.edgeSnapThreshold {
+            shelf.dockedEdge = .left
+            shelf.isEdgePeeked = false
+            animateToDockedFrame()
+        } else if distRight <= Self.edgeSnapThreshold {
+            shelf.dockedEdge = .right
+            shelf.isEdgePeeked = false
+            animateToDockedFrame()
+        } else {
+            shelf.dockedEdge = nil
+            shelf.isEdgePeeked = false
+        }
+    }
+
+    /// Fait ressortir ou replier une étagère aimantée au bord d'écran au survol de la souris / d'un drag.
+    func setEdgePeeked(_ peeked: Bool) {
+        guard shelf.dockedEdge != nil else { return }
+        collapseTask?.cancel()
+
+        if peeked {
+            if !shelf.isEdgePeeked {
+                shelf.isEdgePeeked = true
+                animateToDockedFrame()
+            }
+        } else {
+            collapseTask = Task {
+                try? await Task.sleep(for: .seconds(0.28))
+                guard !Task.isCancelled else { return }
+                guard self.shelf.dockedEdge != nil, !self.shelf.isDropTargeted else { return }
+                // Ne replie pas si la souris est encore dans la fenêtre.
+                if self.frame.contains(NSEvent.mouseLocation) { return }
+                self.shelf.isEdgePeeked = false
+                self.animateToDockedFrame()
+            }
+        }
+    }
+
+    private func animateToDockedFrame() {
+        guard let edge = shelf.dockedEdge else { return }
+        let target = dockedFrame(
+            for: edge,
+            size: frame.size,
+            peeked: shelf.isEdgePeeked || shelf.isDropTargeted,
+            currentY: frame.origin.y
+        )
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.22
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            animator().setFrame(target, display: true)
+        }
+    }
+
+    private func dockedFrame(for edge: DockEdge, size: NSSize, peeked: Bool, currentY: CGFloat) -> NSRect {
+        let currentScreen = screen ?? NSScreen.main
+        guard let visible = currentScreen?.visibleFrame else {
+            return NSRect(origin: frame.origin, size: size)
+        }
+        let margin: CGFloat = 10
+        let clampedY = min(max(currentY, visible.minY + margin), visible.maxY - size.height - margin)
+        let x: CGFloat
+        switch edge {
+        case .left:
+            x = peeked ? visible.minX + 6 : visible.minX - size.width + Self.dockedVisibleWidth
+        case .right:
+            x = peeked ? visible.maxX - size.width - 6 : visible.maxX - Self.dockedVisibleWidth
+        }
+        return NSRect(origin: NSPoint(x: x, y: clampedY), size: size)
     }
 
     func position(near cursorPoint: NSPoint, offsetIndex: Int = 0) {

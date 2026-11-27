@@ -83,6 +83,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 menu.addItem(item)
             }
 
+            let toggleHide = NSMenuItem(
+                title: engine.shelvesHidden ? "Afficher les étagères" : "Masquer toutes les étagères",
+                action: #selector(toggleHideShelves),
+                keyEquivalent: ""
+            )
+            toggleHide.target = self
+            menu.addItem(toggleHide)
+
             let closeAll = NSMenuItem(title: "Fermer toutes les étagères", action: #selector(closeAllShelves), keyEquivalent: "")
             closeAll.target = self
             menu.addItem(closeAll)
@@ -118,6 +126,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         guard let id = sender.representedObject as? UUID,
               let panel = engine?.panels[id] else { return }
         panel.orderFrontRegardless()
+    }
+
+    @objc private func toggleHideShelves() {
+        engine?.toggleHideAllShelves()
     }
 
     @objc private func closeAllShelves() {

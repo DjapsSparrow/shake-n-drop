@@ -50,6 +50,7 @@ final class DropReceiverNSView: NSView {
         if let source = sender.draggingSource as? DragSourceNSView, source.window === self.window {
             return []
         }
+        (window as? ShelfPanel)?.setEdgePeeked(true)
         onTargetChanged?(true)
         return .copy
     }
@@ -191,5 +192,33 @@ struct SharePickerButton: NSViewRepresentable {
             let picker = NSSharingServicePicker(items: urls)
             picker.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
         }
+    }
+}
+
+/// Poignée AppKit native qui déplace fluidement le `NSPanel` sans bordure via `window.performDrag(with:)`,
+/// puis déclenche l'aimantation éventuelle au bord gauche/droit de l'écran à la fin du déplacement.
+struct WindowDragHandle: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowDragNSView {
+        WindowDragNSView()
+    }
+
+    func updateNSView(_ nsView: WindowDragNSView, context: Context) {}
+}
+
+final class WindowDragNSView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let panel = window as? ShelfPanel else {
+            window?.performDrag(with: event)
+            return
+        }
+        // Si l'étagère était repliée sur un bord, on la déploie d'abord pour la déplacer confortablement.
+        if panel.shelf.dockedEdge != nil && !panel.shelf.isEdgePeeked {
+            panel.setEdgePeeked(true)
+        }
+        panel.performDrag(with: event)
+        panel.handleWindowDragFinished()
     }
 }

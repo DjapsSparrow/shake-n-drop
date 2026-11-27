@@ -37,11 +37,49 @@ struct ShelfView: View {
                 )
         }
         .overlay {
+            if shelf.isDockedCollapsed, let edge = shelf.dockedEdge {
+                dockedTabOverlay(edge: edge)
+            }
+        }
+        .overlay {
             ShelfDropTargetView(shelf: shelf, engine: engine)
+        }
+        .onHover { hovering in
+            engine.panels[shelf.id]?.setEdgePeeked(hovering)
         }
         .scaleEffect(shelf.isDropTargeted ? 1.03 : 1.0)
         .animation(.spring(response: 0.24, dampingFraction: 0.78), value: shelf.isDropTargeted)
         .animation(.spring(response: 0.25, dampingFraction: 0.84), value: shelf.items.count)
+    }
+
+    // MARK: - Languette discrète quand l'étagère est rangée sur le bord gauche/droit
+
+    private func dockedTabOverlay(edge: DockEdge) -> some View {
+        HStack {
+            if edge == .left { Spacer() }
+            VStack(spacing: Space.xs) {
+                Image(systemName: edge == .left ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                if !shelf.items.isEmpty {
+                    Text("\(shelf.items.count)")
+                        .font(.caption2.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color.accentColor))
+                } else {
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 30)
+            .frame(maxHeight: .infinity)
+            if edge == .right { Spacer() }
+        }
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.35))
+        .allowsHitTesting(false)
     }
 
     // MARK: - Fond natif Liquid Glass / HUD
@@ -56,86 +94,98 @@ struct ShelfView: View {
     // MARK: - En-tête
 
     private var headerBar: some View {
-        HStack(spacing: Space.xs) {
-            Button {
-                shelf.isPinned.toggle()
-            } label: {
-                Image(systemName: shelf.isPinned ? "pin.fill" : "pin")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(shelf.isPinned ? Color.accentColor : .secondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
+        ZStack {
+            WindowDragHandle()
+
+            HStack(spacing: Space.xs) {
+                Button {
+                    shelf.isPinned.toggle()
+                } label: {
+                    Image(systemName: shelf.isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(shelf.isPinned ? Color.accentColor : .secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(shelf.isPinned ? "Désépingler (l'étagère pourra se fermer après dépôt)" : "Épingler (garder ouverte après dépôt)")
+
+                Spacer(minLength: 4)
+
+                if let message = shelf.statusMessage {
+                    Text(message)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                } else {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.22))
+                        .frame(width: 32, height: 4)
+                        .allowsHitTesting(false)
+                }
+
+                Spacer(minLength: 4)
+
+                Button {
+                    engine.closeShelf(shelf)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Fermer l'étagère")
             }
-            .buttonStyle(.plain)
-            .help(shelf.isPinned ? "Désépingler (l'étagère pourra se fermer après dépôt)" : "Épingler (garder ouverte après dépôt)")
-
-            Spacer(minLength: 4)
-
-            if let message = shelf.statusMessage {
-                Text(message)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .transition(.opacity)
-            } else {
-                Capsule()
-                    .fill(Color.primary.opacity(0.18))
-                    .frame(width: 28, height: 4)
-            }
-
-            Spacer(minLength: 4)
-
-            Button {
-                engine.closeShelf(shelf)
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Fermer l'étagère")
+            .padding(.horizontal, Space.sm)
+            .padding(.top, Space.sm)
+            .padding(.bottom, Space.xs)
         }
-        .padding(.horizontal, Space.sm)
-        .padding(.top, Space.sm)
-        .padding(.bottom, Space.xs)
+        .frame(height: 36)
     }
 
     // MARK: - État vide
 
     private var emptyDropZone: some View {
-        VStack(spacing: Space.sm) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(
-                        shelf.isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.32),
-                        style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
-                    )
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(shelf.isDropTargeted ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.03))
-                    )
+        ZStack {
+            WindowDragHandle()
 
-                VStack(spacing: Space.xs) {
-                    Image(systemName: shelf.isDropTargeted ? "plus.circle.fill" : "tray.and.arrow.down")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(shelf.isDropTargeted ? Color.accentColor : .secondary)
-                        .symbolEffect(.bounce, value: shelf.isDropTargeted)
+            VStack(spacing: Space.sm) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            shelf.isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.32),
+                            style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
+                        )
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(shelf.isDropTargeted ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.03))
+                        )
 
-                    Text(shelf.isDropTargeted ? "Relâchez ici" : "Déposez ici")
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(.primary)
+                    VStack(spacing: Space.xs) {
+                        Image(systemName: shelf.isDropTargeted ? "plus.circle.fill" : "tray.and.arrow.down")
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(shelf.isDropTargeted ? Color.accentColor : .secondary)
+                            .symbolEffect(.bounce, value: shelf.isDropTargeted)
 
-                    Text("Fichiers, images, liens…")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        Text(shelf.isDropTargeted ? "Relâchez ici" : "Déposez ici")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        Text("Fichiers, images, liens…")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(Space.sm)
                 }
-                .padding(Space.sm)
             }
+            .padding(.horizontal, Space.md)
+            .padding(.bottom, Space.md)
+            .allowsHitTesting(false)
         }
-        .padding(.horizontal, Space.md)
-        .padding(.bottom, Space.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -158,19 +208,24 @@ struct ShelfView: View {
             .frame(height: 88)
             .help("Glissez pour déposer tous les éléments • Cliquez ou Espace pour Quick Look")
 
-            VStack(spacing: 2) {
-                Text(shelf.summaryTitle)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+            ZStack {
+                WindowDragHandle()
+                VStack(spacing: 2) {
+                    Text(shelf.summaryTitle)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
 
-                Text(shelf.summarySubtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    Text(shelf.summarySubtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, Space.sm)
+                .allowsHitTesting(false)
             }
-            .padding(.horizontal, Space.sm)
+            .frame(height: 36)
         }
         .padding(.horizontal, Space.sm)
         .padding(.bottom, Space.sm)
