@@ -9,16 +9,12 @@ import SwiftUI
 @main
 struct WebodropApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @Environment(\.openSettings) private var openSettings
 
     var body: some Scene {
         Settings {
             SettingsView()
                 .environment(WebodropEngine.shared)
                 .themed()
-                .onAppear {
-                    WebodropEngine.shared.openSettingsAction = { openSettings() }
-                }
         }
         .windowResizability(.contentSize)
     }

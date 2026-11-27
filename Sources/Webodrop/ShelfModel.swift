@@ -211,11 +211,11 @@ final class WebodropEngine {
     }
 
     @ObservationIgnored var panels: [UUID: ShelfPanel] = [:]
+    @ObservationIgnored private var settingsWindow: NSWindow?
     @ObservationIgnored let shakeMonitor = ShakeMonitor()
     @ObservationIgnored let hotkey = GlobalHotkey()
     @ObservationIgnored let permissions = PermissionMonitor()
     @ObservationIgnored var statusBar: StatusBarController?
-    @ObservationIgnored var openSettingsAction: (() -> Void)?
 
     private enum Keys {
         static let shakeEnabled = "webodrop.shakeEnabled"
@@ -301,12 +301,25 @@ final class WebodropEngine {
     }
 
     func openSettings() {
-        NSApp.activate()
-        if let openSettingsAction {
-            openSettingsAction()
-        } else {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if let existing = settingsWindow {
+            NSApp.activate()
+            existing.makeKeyAndOrderFront(nil)
+            return
         }
+
+        let rootView = SettingsView()
+            .environment(self)
+            .themed()
+        let controller = NSHostingController(rootView: rootView)
+        let window = NSWindow(contentViewController: controller)
+        window.title = "Réglages — Shake'n'Drop"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        settingsWindow = window
+
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Gestion des étagères
