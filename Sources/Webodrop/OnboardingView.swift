@@ -184,7 +184,7 @@ struct OnboardingView: View {
             HStack(spacing: Space.md) {
                 tipBadge(symbol: "hand.wave.fill", label: "Secouer", help: "Secouez le curseur en glissant un fichier ou un lien")
                 tipBadge(symbol: "command", label: engine.shortcut.displayLabel, help: "Ouvre une étagère instantanément au clavier")
-                tipBadge(symbol: "sidebar.right", label: "Repli bord", help: "Poussez une étagère contre le bord gauche ou droit pour la ranger")
+                tipBadge(symbol: "arrow.right.to.line", label: "Repli bord", help: "Cliquez sur ⇥ dans l'en-tête pour ranger l'étagère sur le bord de l'écran")
             }
 
             Spacer(minLength: 0)
