@@ -8,7 +8,24 @@ struct ShelfView: View {
     let engine: WebodropEngine
 
     var body: some View {
-        VStack(spacing: 0) {
+        Group {
+            if shelf.isDockedCollapsed, let edge = shelf.dockedEdge {
+                dockedPillView(edge: edge)
+            } else {
+                fullShelfView
+            }
+        }
+        .overlay {
+            ShelfDropTargetView(shelf: shelf, engine: engine)
+        }
+        .onHover { hovering in
+            engine.panels[shelf.id]?.setEdgePeeked(hovering)
+        }
+    }
+
+    private var fullShelfView: some View {
+        let isPendingDock = shelf.pendingDockEdge != nil
+        return VStack(spacing: 0) {
             headerBar
 
             if shelf.items.isEmpty {
@@ -26,67 +43,77 @@ struct ShelfView: View {
             }
         }
         .background {
-            shelfBackground
+            shelfBackground(cornerRadius: 20)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(
-                    shelf.isDropTargeted ? Palette.accent : Color.primary.opacity(0.14),
-                    lineWidth: shelf.isDropTargeted ? 2.5 : 1
+                    (shelf.isDropTargeted || isPendingDock) ? Palette.accent : Color.primary.opacity(0.14),
+                    lineWidth: (shelf.isDropTargeted || isPendingDock) ? 2.5 : 1
                 )
-        }
-        .overlay {
-            if shelf.isDockedCollapsed, let edge = shelf.dockedEdge {
-                dockedTabOverlay(edge: edge)
-            }
-        }
-        .overlay {
-            ShelfDropTargetView(shelf: shelf, engine: engine)
-        }
-        .onHover { hovering in
-            engine.panels[shelf.id]?.setEdgePeeked(hovering)
         }
         .scaleEffect(shelf.isDropTargeted ? 1.03 : 1.0)
         .animation(.spring(response: 0.24, dampingFraction: 0.78), value: shelf.isDropTargeted)
+        .animation(.spring(response: 0.22, dampingFraction: 0.8), value: isPendingDock)
         .animation(.spring(response: 0.25, dampingFraction: 0.84), value: shelf.items.count)
     }
 
-    // MARK: - Languette discrète quand l'étagère est rangée sur le bord gauche/droit
+    // MARK: - Vraie languette dédiée (40×96) quand l'étagère est rangée sur un bord
 
-    private func dockedTabOverlay(edge: DockEdge) -> some View {
-        HStack {
-            if edge == .left { Spacer() }
-            VStack(spacing: Space.xs) {
+    private func dockedPillView(edge: DockEdge) -> some View {
+        let corners = UnevenRoundedRectangle(
+            topLeadingRadius: edge == .left ? 0 : 16,
+            bottomLeadingRadius: edge == .left ? 0 : 16,
+            bottomTrailingRadius: edge == .right ? 0 : 16,
+            topTrailingRadius: edge == .right ? 0 : 16,
+            style: .continuous
+        )
+        return ZStack {
+            WindowDragHandle()
+
+            VStack(spacing: 6) {
                 Image(systemName: edge == .left ? "chevron.right" : "chevron.left")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
+
                 if !shelf.items.isEmpty {
                     Text("\(shelf.items.count)")
-                        .font(.caption2.weight(.bold))
+                        .font(.caption.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(Palette.onAccent)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 24, height: 24)
                         .background(Circle().fill(Palette.accent))
                 } else {
                     Image(systemName: "tray.and.arrow.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.accent)
                 }
             }
-            .frame(width: 30)
-            .frame(maxHeight: .infinity)
-            if edge == .right { Spacer() }
+            .allowsHitTesting(false)
         }
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.35))
-        .allowsHitTesting(false)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            if #available(macOS 26.0, *) {
+                corners
+                    .fill(.ultraThinMaterial)
+                    .glassEffect(.regular, in: corners)
+            } else {
+                corners.fill(.ultraThinMaterial)
+            }
+        }
+        .clipShape(corners)
+        .overlay(
+            corners.strokeBorder(Palette.accent.opacity(0.45), lineWidth: 1)
+        )
+        .help("Survolez pour ouvrir • Cliquez pour détacher du bord")
     }
 
     // MARK: - Fond natif Liquid Glass / HUD
 
     @ViewBuilder
-    private var shelfBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+    private func shelfBackground(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(macOS 26.0, *) {
             shape
                 .fill(.ultraThinMaterial)
@@ -118,7 +145,14 @@ struct ShelfView: View {
 
                 Spacer(minLength: 4)
 
-                if let message = shelf.statusMessage {
+                if let pending = shelf.pendingDockEdge {
+                    Text(pending == .left ? "← Ranger à gauche" : "Ranger à droite →")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Palette.accent)
+                        .lineLimit(1)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                } else if let message = shelf.statusMessage {
                     Text(message)
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)

@@ -79,6 +79,7 @@ final class Shelf: Identifiable {
     var isBusy: Bool = false
     var statusMessage: String?
     var dockedEdge: DockEdge? = nil
+    var pendingDockEdge: DockEdge? = nil
     var isEdgePeeked: Bool = false
     var summonedByShake: Bool = false
     let createdAt: Date = .now

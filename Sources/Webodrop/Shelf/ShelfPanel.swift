@@ -10,9 +10,10 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
     private var quickLookIndex: Int = 0
     private var collapseTask: Task<Void, Never>?
 
-    private static let edgeSnapThreshold: CGFloat = 12
-    private static let dockedVisibleWidth: CGFloat = 32
+    private static let edgeSnapThreshold: CGFloat = 22
+    private static let dockedPillSize = NSSize(width: 40, height: 96)
     private var isUserDraggingWindow: Bool = false
+    private var moveObserver: NSObjectProtocol?
 
     init(shelf: Shelf, engine: WebodropEngine, compact: Bool) {
         self.shelf = shelf
@@ -42,6 +43,16 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         hosting.sizingOptions = []
         hosting.frame = NSRect(origin: .zero, size: initialSize)
         contentView = hosting
+
+        moveObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification,
+            object: self,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.updatePendingDockEdgeIfDragging()
+            }
+        }
     }
 
     override var canBecomeKey: Bool { true }
@@ -65,6 +76,9 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
     // MARK: - Placement & Redimensionnement
 
     static func targetSize(for shelf: Shelf, compact: Bool) -> NSSize {
+        if shelf.isDockedCollapsed {
+            return dockedPillSize
+        }
         let baseWidth: CGFloat = compact ? 188 : 212
         if shelf.items.isEmpty {
             return NSSize(width: baseWidth, height: compact ? 176 : 196)
@@ -80,21 +94,38 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
     func updateSize(for shelf: Shelf, compact: Bool) {
         let newSize = Self.targetSize(for: shelf, compact: compact)
         guard frame.size != newSize else { return }
-        // Garde le bord supérieur fixe lors du déploiement vers le bas.
-        let topY = frame.maxY
-        let newOrigin = NSPoint(x: frame.origin.x, y: topY - newSize.height)
+        let midY = frame.midY
         let targetRect: NSRect
         if let edge = shelf.dockedEdge {
-            targetRect = dockedFrame(for: edge, size: newSize, peeked: shelf.isEdgePeeked || shelf.isDropTargeted, currentY: newOrigin.y)
+            targetRect = dockedFrame(for: edge, size: newSize, peeked: shelf.isEdgePeeked || shelf.isDropTargeted, centerY: midY)
         } else {
+            let topY = frame.maxY
+            let newOrigin = NSPoint(x: frame.origin.x, y: topY - newSize.height)
             targetRect = clampedToScreen(NSRect(origin: newOrigin, size: newSize))
         }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
+            ctx.duration = 0.2
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             animator().setFrame(targetRect, display: true)
         }
         contentView?.frame = NSRect(origin: .zero, size: newSize)
+    }
+
+    /// Met à jour `shelf.pendingDockEdge` en temps réel pendant que l'utilisateur déplace l'étagère.
+    private func updatePendingDockEdgeIfDragging() {
+        guard isUserDraggingWindow else { return }
+        let currentScreen = screen ?? NSScreen.main
+        guard let visible = currentScreen?.visibleFrame else { return }
+        let distLeft = frame.minX - visible.minX
+        let distRight = visible.maxX - frame.maxX
+
+        if distLeft <= Self.edgeSnapThreshold {
+            shelf.pendingDockEdge = .left
+        } else if distRight <= Self.edgeSnapThreshold {
+            shelf.pendingDockEdge = .right
+        } else {
+            shelf.pendingDockEdge = nil
+        }
     }
 
     /// Appelé juste avant `performDrag(with:)` : annule tout repli et détache l'étagère du bord.
@@ -102,32 +133,28 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         isUserDraggingWindow = true
         collapseTask?.cancel()
         if let edge = shelf.dockedEdge {
-            // Si elle était repliée en languette, on la ramène entièrement à l'écran avant le drag.
-            if !shelf.isEdgePeeked {
-                let unpeeked = dockedFrame(for: edge, size: frame.size, peeked: true, currentY: frame.origin.y)
-                setFrame(unpeeked, display: true)
-            }
+            let wasCollapsed = shelf.isDockedCollapsed
             shelf.dockedEdge = nil
             shelf.isEdgePeeked = false
+            if wasCollapsed {
+                let fullSize = Self.targetSize(for: shelf, compact: engine?.compactMode ?? false)
+                let rect = dockedFrame(for: edge, size: fullSize, peeked: true, centerY: frame.midY)
+                setFrame(rect, display: true)
+                contentView?.frame = NSRect(origin: .zero, size: fullSize)
+            }
         }
+        updatePendingDockEdgeIfDragging()
     }
 
     /// Appelé juste après `performDrag(with:)` : aimante l'étagère au bord gauche/droit
-    /// uniquement si l'utilisateur l'a volontairement poussée contre le bord.
+    /// si l'indicateur de bord était actif au moment du relâchement.
     func handleWindowDragFinished() {
         isUserDraggingWindow = false
-        let currentScreen = screen ?? NSScreen.main
-        guard let visible = currentScreen?.visibleFrame else { return }
+        let chosenEdge = shelf.pendingDockEdge
+        shelf.pendingDockEdge = nil
 
-        let distLeft = frame.minX - visible.minX
-        let distRight = visible.maxX - frame.maxX
-
-        if distLeft <= Self.edgeSnapThreshold {
-            shelf.dockedEdge = .left
-            shelf.isEdgePeeked = false
-            animateToDockedFrame()
-        } else if distRight <= Self.edgeSnapThreshold {
-            shelf.dockedEdge = .right
+        if let edge = chosenEdge {
+            shelf.dockedEdge = edge
             shelf.isEdgePeeked = false
             animateToDockedFrame()
         } else {
@@ -136,23 +163,29 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         }
     }
 
-    /// Détache explicitement une étagère du bord (ex: simple clic sur la barre du haut ou la languette).
+    /// Détache explicitement une étagère du bord (ex: simple clic sur la languette ou la barre du haut).
     func undockFromEdge(from edge: DockEdge) {
         isUserDraggingWindow = false
         collapseTask?.cancel()
+        shelf.pendingDockEdge = nil
+        shelf.dockedEdge = nil
+        shelf.isEdgePeeked = false
+
+        let fullSize = Self.targetSize(for: shelf, compact: engine?.compactMode ?? false)
         let currentScreen = screen ?? NSScreen.main
         let visible = currentScreen?.visibleFrame ?? frame
         let targetX: CGFloat = edge == .left
-            ? visible.minX + 40
-            : visible.maxX - frame.width - 40
-        let target = NSRect(origin: NSPoint(x: targetX, y: frame.origin.y), size: frame.size)
-        shelf.dockedEdge = nil
-        shelf.isEdgePeeked = false
+            ? visible.minX + 36
+            : visible.maxX - fullSize.width - 36
+        let targetY = min(max(frame.midY - fullSize.height * 0.5, visible.minY + 12), visible.maxY - fullSize.height - 12)
+        let target = NSRect(origin: NSPoint(x: targetX, y: targetY), size: fullSize)
+
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.22
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             animator().setFrame(target, display: true)
         }
+        contentView?.frame = NSRect(origin: .zero, size: fullSize)
     }
 
     /// Fait ressortir ou replier une étagère aimantée au bord d'écran au survol de la souris / d'un drag.
@@ -179,32 +212,34 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
 
     private func animateToDockedFrame() {
         guard let edge = shelf.dockedEdge else { return }
+        let targetSize = Self.targetSize(for: shelf, compact: engine?.compactMode ?? false)
         let target = dockedFrame(
             for: edge,
-            size: frame.size,
+            size: targetSize,
             peeked: shelf.isEdgePeeked || shelf.isDropTargeted,
-            currentY: frame.origin.y
+            centerY: frame.midY
         )
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.22
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             animator().setFrame(target, display: true)
         }
+        contentView?.frame = NSRect(origin: .zero, size: targetSize)
     }
 
-    private func dockedFrame(for edge: DockEdge, size: NSSize, peeked: Bool, currentY: CGFloat) -> NSRect {
+    private func dockedFrame(for edge: DockEdge, size: NSSize, peeked: Bool, centerY: CGFloat) -> NSRect {
         let currentScreen = screen ?? NSScreen.main
         guard let visible = currentScreen?.visibleFrame else {
             return NSRect(origin: frame.origin, size: size)
         }
-        let margin: CGFloat = 10
-        let clampedY = min(max(currentY, visible.minY + margin), visible.maxY - size.height - margin)
+        let margin: CGFloat = 12
+        let clampedY = min(max(centerY - size.height * 0.5, visible.minY + margin), visible.maxY - size.height - margin)
         let x: CGFloat
         switch edge {
         case .left:
-            x = peeked ? visible.minX + 6 : visible.minX - size.width + Self.dockedVisibleWidth
+            x = peeked ? visible.minX + 8 : visible.minX
         case .right:
-            x = peeked ? visible.maxX - size.width - 6 : visible.maxX - Self.dockedVisibleWidth
+            x = peeked ? visible.maxX - size.width - 8 : visible.maxX - size.width
         }
         return NSRect(origin: NSPoint(x: x, y: clampedY), size: size)
     }
