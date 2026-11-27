@@ -216,7 +216,6 @@ final class WebodropEngine {
     @ObservationIgnored private var feedbackWindow: NSWindow?
     @ObservationIgnored let shakeMonitor = ShakeMonitor()
     @ObservationIgnored let hotkey = GlobalHotkey()
-    @ObservationIgnored let permissions = PermissionMonitor()
     @ObservationIgnored let updater = UpdateChecker()
     @ObservationIgnored var statusBar: StatusBarController?
 
@@ -287,8 +286,6 @@ final class WebodropEngine {
             self?.summonShelfNearCursor(reuseEmpty: false)
         }
         hotkey.register(shortcut)
-
-        permissions.startMonitoring()
 
         if !SelfTest.requested && !Snapshot.requested {
             updater.scheduleBackgroundCheckIfNeeded()

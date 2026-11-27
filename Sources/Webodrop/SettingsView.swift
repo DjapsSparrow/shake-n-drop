@@ -47,25 +47,6 @@ struct SettingsView: View {
                 ))
             }
 
-            Section("Autorisation Système (Accessibilité)") {
-                HStack {
-                    Label(
-                        engine.permissions.accessibilityGranted ? "Autorisée" : "Recommandée pour le Shake global",
-                        systemImage: engine.permissions.accessibilityGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(engine.permissions.accessibilityGranted ? .green : .orange)
-                    Spacer()
-                    if !engine.permissions.accessibilityGranted {
-                        Button("Ouvrir Réglages Système") {
-                            engine.permissions.openAccessibilitySettings()
-                        }
-                    }
-                }
-                Text("Permet de détecter la secousse du curseur depuis toutes vos applications. Le raccourci global et la barre de menu fonctionnent sans aucune autorisation.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("Mises à jour") {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -111,9 +92,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            engine.permissions.refresh()
-        }
     }
 
     private var shortcutTab: some View {

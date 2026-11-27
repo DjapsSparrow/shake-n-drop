@@ -1,18 +1,16 @@
 import AppKit
 import SwiftUI
 
-/// Parcours d'installation guidé en 3 étapes au premier lancement :
+/// Parcours d'installation guidé en 2 étapes au premier lancement (aucune autorisation requise) :
 /// 1. Installation automatique dans `/Applications` (+ ajout optionnel au Dock) avec animation "Bien installé !"
-/// 2. Autorisation Accessibilité (détection en direct)
-/// 3. Prise en main rapide + lancement de la première étagère
+/// 2. Prise en main rapide + lancement de la première étagère
 struct OnboardingView: View {
     @Environment(WebodropEngine.self) private var engine
     let onFinish: () -> Void
 
     enum Step: Int, CaseIterable {
         case install = 0
-        case permissions = 1
-        case ready = 2
+        case ready = 1
     }
 
     @State private var step: Step
@@ -29,9 +27,7 @@ struct OnboardingView: View {
 
     init(onFinish: @escaping () -> Void) {
         self.onFinish = onFinish
-        // Si l'app est déjà dans /Applications, on commence quand même par la confirmation rapide
-        // ou directement l'étape 1 déjà validée.
-        _step = State(initialValue: Self.isAlreadyInApplications ? .permissions : .install)
+        _step = State(initialValue: Self.isAlreadyInApplications ? .ready : .install)
     }
 
     var body: some View {
@@ -44,8 +40,6 @@ struct OnboardingView: View {
                 switch step {
                 case .install:
                     installStepView
-                case .permissions:
-                    permissionsStepView
                 case .ready:
                     readyStepView
                 }
@@ -54,13 +48,8 @@ struct OnboardingView: View {
             .padding(Space.xl)
             .animation(.spring(response: 0.32, dampingFraction: 0.84), value: step)
         }
-        .frame(width: 480, height: 400)
-        .onAppear {
-            engine.permissions.refresh()
-        }
+        .frame(width: 480, height: 380)
     }
-
-    // MARK: - Barre d'étapes
 
     private var progressHeader: some View {
         HStack(spacing: Space.sm) {
@@ -124,7 +113,7 @@ struct OnboardingView: View {
             HStack {
                 if !justInstalled {
                     Button("Passer") {
-                        step = .permissions
+                        step = .ready
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -134,7 +123,7 @@ struct OnboardingView: View {
 
                 if justInstalled {
                     Button("Continuer") {
-                        step = .permissions
+                        step = .ready
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
@@ -161,61 +150,7 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Étape 2 : Accessibilité (Shake global)
-
-    private var permissionsStepView: some View {
-        VStack(spacing: Space.lg) {
-            Spacer(minLength: 0)
-
-            Image(systemName: engine.permissions.accessibilityGranted ? "checkmark.shield.fill" : "hand.wave.fill")
-                .font(.system(size: 52, weight: .semibold))
-                .foregroundStyle(engine.permissions.accessibilityGranted ? Color.green : Palette.accent)
-                .contentTransition(.symbolEffect(.replace))
-
-            VStack(spacing: Space.xs) {
-                Text(engine.permissions.accessibilityGranted ? "Shake global activé !" : "Activer la secousse magique")
-                    .font(.title2.weight(.bold))
-
-                Text(engine.permissions.accessibilityGranted
-                     ? "Vous pouvez maintenant secouer votre curseur en glissant un fichier depuis n'importe quelle application."
-                     : "Autorisez Shake'n'Drop dans Accessibilité pour détecter quand vous secouez la souris depuis le Finder ou votre navigateur.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if !engine.permissions.accessibilityGranted {
-                Button {
-                    engine.permissions.openAccessibilitySettings()
-                } label: {
-                    Label("Ouvrir Réglages Système → Accessibilité", systemImage: "lock.open.fill")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-            }
-
-            Spacer(minLength: 0)
-
-            HStack {
-                if !Self.isAlreadyInApplications {
-                    Button("Retour") { step = .install }
-                }
-                Spacer()
-                Button(engine.permissions.accessibilityGranted ? "Continuer" : "Plus tard") {
-                    step = .ready
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.65).delay(0.1)) {
-                        showDoneCheck = true
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-    }
-
-    // MARK: - Étape 3 : Prêt !
+    // MARK: - Étape 2 : Prêt !
 
     private var readyStepView: some View {
         VStack(spacing: Space.lg) {
@@ -238,7 +173,7 @@ struct OnboardingView: View {
                 Text("Shake'n'Drop est prêt !")
                     .font(.title2.weight(.bold))
 
-                Text("Secouez le curseur en glissant un fichier, utilisez \(engine.shortcut.displayLabel), ou glissez directement sur l'icône en haut.")
+                Text("Secouez le curseur en glissant un fichier ou un lien, utilisez \(engine.shortcut.displayLabel), ou glissez directement sur l'icône en haut.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -327,7 +262,6 @@ struct OnboardingView: View {
             try fm.copyItem(at: source, to: dest)
         }
 
-        // Supprime l'attribut de quarantaine sur la copie installée si présent.
         let xattr = Process()
         xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
         xattr.arguments = ["-cr", dest.path]
