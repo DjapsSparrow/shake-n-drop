@@ -26,7 +26,16 @@ struct FeedbackView: View {
             if loadFailed {
                 offlineFallback
             } else {
-                FeedbackWebView(url: formURL, isLoading: $isLoading, loadFailed: $loadFailed)
+                FeedbackWebView(
+                    url: formURL,
+                    isLoading: $isLoading,
+                    loadFailed: $loadFailed,
+                    onClose: onClose,
+                    onOpenSettings: {
+                        onClose()
+                        engine.openSettings()
+                    }
+                )
                 if isLoading {
                     ProgressView("Chargement du formulaire…")
                         .padding(Space.lg)
@@ -69,13 +78,17 @@ private struct FeedbackWebView: NSViewRepresentable {
     let url: URL
     @Binding var isLoading: Bool
     @Binding var loadFailed: Bool
+    let onClose: () -> Void
+    let onOpenSettings: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isLoading: $isLoading, loadFailed: $loadFailed)
+        Coordinator(isLoading: $isLoading, loadFailed: $loadFailed, onClose: onClose, onOpenSettings: onOpenSettings)
     }
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        let config = WKWebViewConfiguration()
+        config.userContentController.add(context.coordinator, name: "shakendrop")
+        let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.load(URLRequest(url: url))
@@ -84,13 +97,34 @@ private struct FeedbackWebView: NSViewRepresentable {
 
     func updateNSView(_ nsView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         @Binding var isLoading: Bool
         @Binding var loadFailed: Bool
+        let onClose: () -> Void
+        let onOpenSettings: () -> Void
 
-        init(isLoading: Binding<Bool>, loadFailed: Binding<Bool>) {
+        init(
+            isLoading: Binding<Bool>,
+            loadFailed: Binding<Bool>,
+            onClose: @escaping () -> Void,
+            onOpenSettings: @escaping () -> Void
+        ) {
             _isLoading = isLoading
             _loadFailed = loadFailed
+            self.onClose = onClose
+            self.onOpenSettings = onOpenSettings
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let action = message.body as? String else { return }
+            switch action {
+            case "close":
+                onClose()
+            case "settings":
+                onOpenSettings()
+            default:
+                break
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

@@ -144,9 +144,11 @@
       min-block-size: 0;
     }
 
+    [hidden],
     .feedback-form[hidden],
     .success-panel[hidden],
-    .form-status[hidden] {
+    .form-status[hidden],
+    .btn[hidden] {
       display: none;
     }
 
@@ -333,6 +335,18 @@
       outline: none;
     }
 
+    .success-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-sm);
+    }
+
+    .success-actions .btn-reset {
+      margin-inline-end: auto;
+    }
+
     /* Actions */
     .actions {
       display: flex;
@@ -386,7 +400,6 @@
       background-color: var(--segment-track);
       border-color: var(--border);
       color: var(--text);
-      align-self: flex-start;
     }
 
     .btn-secondary:hover {
@@ -447,7 +460,8 @@
         grid-template-columns: 1fr;
       }
 
-      .actions .btn-primary {
+      .actions .btn-primary,
+      .success-actions .btn {
         inline-size: 100%;
       }
     }
@@ -587,7 +601,11 @@
       <div id="success-msg" class="banner banner-success" role="status">
         <span>✅ Merci ! Votre message a bien été envoyé à support@webomatik.fr.</span>
       </div>
-      <button type="button" id="reset-btn" class="btn btn-secondary">Envoyer un autre message</button>
+      <div class="success-actions">
+        <button type="button" id="reset-btn" class="btn btn-secondary btn-reset">Envoyer un autre message</button>
+        <button type="button" id="settings-btn" class="btn btn-secondary" hidden>Réglages</button>
+        <button type="button" id="close-btn" class="btn btn-primary">Fermer</button>
+      </div>
     </section>
   </main>
 
@@ -617,6 +635,13 @@
       const statusBox = document.getElementById("form-status");
       const successPanel = document.getElementById("success-panel");
       const resetBtn = document.getElementById("reset-btn");
+      const settingsBtn = document.getElementById("settings-btn");
+      const closeBtn = document.getElementById("close-btn");
+
+      const nativeBridge = window.webkit?.messageHandlers?.shakendrop;
+      if (nativeBridge) {
+        settingsBtn.hidden = false;
+      }
 
       appVersionInput.value = cleanVersion || "Non renseignée";
       osVersionInput.value = osVersion || "Non renseignée";
@@ -836,6 +861,18 @@
         document.title = "Idée ou bug ? — Shake'n'Drop";
         syncContextFields();
         messageInput.focus();
+      });
+
+      settingsBtn.addEventListener("click", () => {
+        window.webkit?.messageHandlers?.shakendrop?.postMessage("settings");
+      });
+
+      closeBtn.addEventListener("click", () => {
+        if (window.webkit?.messageHandlers?.shakendrop) {
+          window.webkit.messageHandlers.shakendrop.postMessage("close");
+        } else {
+          window.close();
+        }
       });
     })();
   </script>
