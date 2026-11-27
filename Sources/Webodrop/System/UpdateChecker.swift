@@ -18,6 +18,7 @@ final class UpdateChecker {
     private(set) var isInstalling: Bool = false
     private(set) var availableUpdate: ReleaseInfo?
     private(set) var statusText: String = ""
+    @ObservationIgnored private var updateWindow: NSWindow?
 
     var currentVersion: String {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"
@@ -75,25 +76,31 @@ final class UpdateChecker {
     }
 
     func promptToInstall(_ release: ReleaseInfo) {
-        NSApp.activate()
-        let alert = NSAlert()
-        alert.messageText = "Mise à jour Shake'n'Drop v\(release.version) disponible"
-        let notesText = release.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        alert.informativeText = notesText.isEmpty
-            ? "Une nouvelle version est prête à être téléchargée et installée automatiquement."
-            : notesText
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Installer et relancer")
-        alert.addButton(withTitle: "Plus tard")
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            Task {
-                await downloadAndInstall(release)
-            }
+        if let existing = updateWindow {
+            existing.close()
+            updateWindow = nil
         }
+
+        var windowRef: NSWindow?
+        let view = UpdatePromptView(release: release, updater: self) {
+            windowRef?.close()
+        }
+        .themed()
+
+        let controller = NSHostingController(rootView: view)
+        let window = NSWindow(contentViewController: controller)
+        window.title = "Mise à jour — Shake'n'Drop"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        windowRef = window
+        updateWindow = window
+
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
     }
 
-    private func downloadAndInstall(_ release: ReleaseInfo) async {
+    func downloadAndInstall(_ release: ReleaseInfo) async {
         guard !isInstalling else { return }
         isInstalling = true
         statusText = "Téléchargement de v\(release.version)…"
