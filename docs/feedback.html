@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Idée ou bug ? — Shake'n'Drop</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+
+      --accent: #5445EE;
+      --accent-hover: #4738DE;
+      --accent-active: #3B2EC8;
+      --accent-focus: #5445EE;
+      --accent-ink: #FFFFFF;
+
+      --surface: Canvas;
+      --text: CanvasText;
+      --field-bg: Field;
+      --field-text: FieldText;
+
+      --muted: GrayText;
+      --muted: color-mix(in oklab, CanvasText 66%, Canvas);
+      --border: rgba(128, 128, 128, 0.36);
+      --border: color-mix(in oklab, CanvasText 24%, Canvas);
+      --border-strong: rgba(128, 128, 128, 0.56);
+      --border-strong: color-mix(in oklab, CanvasText 40%, Canvas);
+
+      --segment-track: rgba(128, 128, 128, 0.14);
+      --segment-track: color-mix(in oklab, CanvasText 8%, Canvas);
+      --segment-thumb: Field;
+      --segment-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+
+      --success-bg: #EAF7EE;
+      --success-border: #7AD096;
+      --success-text: #134E2A;
+
+      --error-bg: #FDECEC;
+      --error-border: #F2A2A2;
+      --error-text: #9E1C1C;
+
+      --radius-sm: 8px;
+      --radius-md: 10px;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --accent-hover: #6456F5;
+        --accent-active: #4738DE;
+        --accent-focus: #9A90FF;
+
+        --segment-thumb: color-mix(in oklab, CanvasText 17%, Canvas);
+        --segment-shadow: 0 1px 2px rgba(0, 0, 0, 0.42), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+
+        --success-bg: #132C1C;
+        --success-border: #2C7748;
+        --success-text: #BCEFD0;
+
+        --error-bg: #321618;
+        --error-border: #8B3439;
+        --error-text: #FFC8C8;
+      }
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+      background-color: var(--surface);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-block-size: 100dvh;
+      background-color: var(--surface);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      font-size: 0.8125rem;
+    }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute;
+      clip-path: inset(50%);
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      margin: -1px;
+      padding: 0;
+      border: 0;
+      white-space: nowrap;
+    }
+
+    .sheet {
+      inline-size: 100%;
+      max-inline-size: 30rem;
+      min-block-size: 100dvh;
+      padding: clamp(14px, 3.6vw, 20px);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .sheet-header {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sheet-title {
+      margin: 0;
+      font-size: clamp(1.0625rem, 2.4vw, 1.1875rem);
+      font-weight: 600;
+      line-height: 1.25;
+      letter-spacing: -0.015em;
+    }
+
+    .sheet-subtitle {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .feedback-form {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      min-block-size: 0;
+    }
+
+    .feedback-form[hidden],
+    .success-panel[hidden],
+    .form-status[hidden] {
+      display: none;
+    }
+
+    /* Contrôle segmenté natif macOS */
+    .segmented {
+      margin: 0;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background-color: var(--segment-track);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 2px;
+    }
+
+    .segment {
+      position: relative;
+      display: flex;
+    }
+
+    .segment-label {
+      flex: 1 1 auto;
+      min-block-size: 30px;
+      padding-block: 5px;
+      padding-inline: 8px;
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .segment-label:hover {
+      color: var(--text);
+    }
+
+    .segment input[type="radio"]:checked + .segment-label {
+      background-color: var(--segment-thumb);
+      color: var(--field-text);
+      font-weight: 600;
+      box-shadow: var(--segment-shadow);
+    }
+
+    .segment input[type="radio"]:focus-visible + .segment-label {
+      outline: 2px solid var(--accent-focus);
+      outline-offset: 1px;
+    }
+
+    /* Champs formulaire */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .field-grow {
+      flex: 1 1 auto;
+      min-block-size: 0;
+    }
+
+    .field-label {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .label-hint {
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .req {
+      color: var(--accent-focus);
+      font-weight: 700;
+    }
+
+    .control {
+      inline-size: 100%;
+      font: inherit;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      color: var(--field-text);
+      background-color: var(--field-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding-block: 7px;
+      padding-inline: 10px;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .control::placeholder {
+      color: var(--muted);
+      opacity: 0.85;
+    }
+
+    .control:hover {
+      border-color: var(--border-strong);
+    }
+
+    .control:focus-visible {
+      outline: 2px solid var(--accent-focus);
+      outline-offset: 1px;
+      border-color: var(--accent-focus);
+    }
+
+    input.control {
+      min-block-size: 34px;
+    }
+
+    textarea.control {
+      flex: 1 1 auto;
+      min-block-size: 104px;
+      resize: vertical;
+    }
+
+    .control:is(:user-invalid, .is-invalid) {
+      border-color: var(--error-border);
+      background-color: var(--error-bg);
+      color: var(--error-text);
+    }
+
+    .field-error {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      line-height: 1.3;
+      color: var(--error-text);
+    }
+
+    .field:has(.control:is(:user-invalid, .is-invalid)) .field-error {
+      display: flex;
+    }
+
+    /* Bannières statut */
+    .banner {
+      padding-block: 10px;
+      padding-inline: 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: 0.8125rem;
+      line-height: 1.4;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .banner-success {
+      background-color: var(--success-bg);
+      border-color: var(--success-border);
+      color: var(--success-text);
+    }
+
+    .banner-error {
+      background-color: var(--error-bg);
+      border-color: var(--error-border);
+      color: var(--error-text);
+    }
+
+    .success-panel {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: var(--space-lg);
+    }
+
+    .success-panel:focus {
+      outline: none;
+    }
+
+    /* Actions */
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-sm);
+      margin-block-start: auto;
+    }
+
+    .btn {
+      font: inherit;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      min-block-size: 34px;
+      padding-block: 7px;
+      padding-inline: 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: background-color 140ms ease, opacity 140ms ease, border-color 140ms ease;
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--accent-focus);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      background-color: var(--accent-active);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.65;
+      cursor: progress;
+    }
+
+    .btn-secondary {
+      background-color: var(--segment-track);
+      border-color: var(--border);
+      color: var(--text);
+      align-self: flex-start;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--border-strong);
+    }
+
+    .spinner {
+      inline-size: 13px;
+      block-size: 13px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-block-start-color: #FFFFFF;
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .segment-label,
+      .control,
+      .btn {
+        transition: none;
+      }
+
+      .spinner {
+        animation: none;
+      }
+    }
+
+    /* Adaptation tactile & très petits écrans */
+    @media (pointer: coarse) {
+      body {
+        font-size: 1rem;
+      }
+
+      .segment-label {
+        min-block-size: 44px;
+        font-size: 0.9375rem;
+      }
+
+      .control {
+        font-size: max(1rem, 1em);
+        min-block-size: 48px;
+      }
+
+      .btn {
+        min-block-size: 44px;
+        font-size: 0.9375rem;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .segmented {
+        grid-template-columns: 1fr;
+      }
+
+      .actions .btn-primary {
+        inline-size: 100%;
+      }
+    }
+
+    /* Mode Contraste Élevé (Forced Colors) */
+    @media (forced-colors: active) {
+      .segmented,
+      .control,
+      .banner,
+      .btn {
+        border: 1px solid ButtonBorder;
+      }
+
+      .segment input[type="radio"]:checked + .segment-label {
+        background-color: Highlight;
+        color: HighlightText;
+        forced-color-adjust: none;
+      }
+
+      .btn-primary {
+        background-color: Highlight;
+        color: HighlightText;
+        border-color: Highlight;
+      }
+
+      .segment input[type="radio"]:focus-visible + .segment-label,
+      .control:focus-visible,
+      .btn:focus-visible {
+        outline: 2px solid Highlight;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <header class="sheet-header">
+      <h1 class="sheet-title">Idée ou bug ?</h1>
+      <p class="sheet-subtitle">Envoyé directement à support@webomatik.fr</p>
+    </header>
+
+    <form id="feedback-form" class="feedback-form" novalidate>
+      <!-- Métadonnées Web3Forms -->
+      <input type="hidden" name="access_key" value="93fed49f-f041-45f9-ad44-2760ca3441bb">
+      <input type="hidden" name="from_name" value="Shake'n'Drop App">
+      <input type="hidden" name="subject" id="field-subject" value="">
+      <input type="hidden" name="app_version" id="field-app-version" value="">
+      <input type="hidden" name="macos_version" id="field-macos-version" value="">
+      <input type="checkbox" name="botcheck" class="visually-hidden" tabindex="-1" aria-hidden="true" autocomplete="off">
+
+      <!-- Contrôle segmenté -->
+      <fieldset class="segmented">
+        <legend class="visually-hidden">Type de retour</legend>
+        <div class="segment">
+          <input
+            type="radio"
+            id="kind-idea"
+            name="type"
+            value="Idée d'amélioration"
+            data-kind="idea"
+            class="visually-hidden"
+            checked
+          >
+          <label for="kind-idea" class="segment-label">💡 Idée d'amélioration</label>
+        </div>
+        <div class="segment">
+          <input
+            type="radio"
+            id="kind-bug"
+            name="type"
+            value="Signaler un bug"
+            data-kind="bug"
+            class="visually-hidden"
+          >
+          <label for="kind-bug" class="segment-label">🐞 Signaler un bug</label>
+        </div>
+      </fieldset>
+
+      <!-- Email (optionnel) -->
+      <div class="field">
+        <label for="email" class="field-label">
+          Email <span class="label-hint">(optionnel, pour vous répondre)</span>
+        </label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          class="control"
+          autocomplete="email"
+          inputmode="email"
+          autocorrect="off"
+          autocapitalize="none"
+          spellcheck="false"
+          enterkeyhint="next"
+          placeholder="vous@exemple.fr"
+          aria-invalid="false"
+          data-error="email-error"
+        >
+        <div id="email-error" class="field-error">
+          <span role="img" aria-label="Erreur">⚠️</span>
+          <span>Saisissez une adresse email valide (ex. nom@domaine.fr).</span>
+        </div>
+      </div>
+
+      <!-- Message (requis) -->
+      <div class="field field-grow">
+        <label for="message" class="field-label">
+          Message <span class="req" aria-hidden="true">*</span>
+        </label>
+        <textarea
+          id="message"
+          name="message"
+          class="control"
+          required
+          rows="4"
+          enterkeyhint="send"
+          placeholder="Décrivez la fonctionnalité ou l'amélioration que vous aimeriez voir dans Shake'n'Drop…"
+          aria-invalid="false"
+          data-error="message-error"
+        ></textarea>
+        <div id="message-error" class="field-error">
+          <span role="img" aria-label="Erreur">⚠️</span>
+          <span>Veuillez saisir votre message avant d'envoyer.</span>
+        </div>
+      </div>
+
+      <!-- Erreur réseau / API -->
+      <div id="form-status" class="banner banner-error form-status" role="alert" hidden></div>
+
+      <!-- Bouton d'envoi -->
+      <div class="actions">
+        <button type="submit" id="submit-btn" class="btn btn-primary">Envoyer</button>
+      </div>
+    </form>
+
+    <!-- Confirmation succès -->
+    <section id="success-panel" class="success-panel" tabindex="-1" aria-labelledby="success-msg" hidden>
+      <div id="success-msg" class="banner banner-success" role="status">
+        <span>✅ Merci ! Votre message a bien été envoyé à support@webomatik.fr.</span>
+      </div>
+      <button type="button" id="reset-btn" class="btn btn-secondary">Envoyer un autre message</button>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const ENDPOINT = "https://api.web3forms.com/submit";
+      const PLACEHOLDERS = {
+        idea: "Décrivez la fonctionnalité ou l'amélioration que vous aimeriez voir dans Shake'n'Drop…",
+        bug: "Que faisiez-vous ? Que s'est-il passé ? (étapes pour reproduire le bug…)",
+      };
+
+      const params = new URLSearchParams(location.search);
+      const rawVersion = (params.get("v") || "").trim();
+      const cleanVersion = rawVersion.replace(/^v/i, "");
+      const osVersion = (params.get("os") || "").trim();
+      const rawType = (params.get("type") || "").trim().toLowerCase();
+
+      const form = document.getElementById("feedback-form");
+      const subjectInput = document.getElementById("field-subject");
+      const appVersionInput = document.getElementById("field-app-version");
+      const osVersionInput = document.getElementById("field-macos-version");
+      const ideaRadio = document.getElementById("kind-idea");
+      const bugRadio = document.getElementById("kind-bug");
+      const emailInput = document.getElementById("email");
+      const messageInput = document.getElementById("message");
+      const submitBtn = document.getElementById("submit-btn");
+      const statusBox = document.getElementById("form-status");
+      const successPanel = document.getElementById("success-panel");
+      const resetBtn = document.getElementById("reset-btn");
+
+      appVersionInput.value = cleanVersion || "Non renseignée";
+      osVersionInput.value = osVersion || "Non renseignée";
+
+      if (rawType === "bug") {
+        bugRadio.checked = true;
+      } else {
+        ideaRadio.checked = true;
+      }
+
+      const selectedKind = () => (bugRadio.checked ? bugRadio : ideaRadio);
+
+      const syncContextFields = () => {
+        const current = selectedKind();
+        const typeLabel = current.value;
+        const versionTag = cleanVersion ? `v${cleanVersion}` : "web";
+        subjectInput.value = `[Shake'n'Drop ${versionTag}] ${typeLabel}`;
+        messageInput.placeholder = PLACEHOLDERS[current.dataset.kind] || PLACEHOLDERS.idea;
+      };
+
+      syncContextFields();
+
+      // Annonceur ARIA poli centralisé pour les erreurs de validation
+      const announcer = document.createElement("div");
+      announcer.setAttribute("aria-live", "polite");
+      announcer.className = "visually-hidden";
+      document.body.append(announcer);
+      let announceTimer;
+      let announcedField;
+
+      const linkError = (el, shown) => {
+        const errorId = el.dataset.error;
+        if (!errorId) return;
+        const ids = (el.getAttribute("aria-describedby") || "")
+          .split(/\s+/)
+          .filter((id) => id && id !== errorId);
+        if (shown) ids.push(errorId);
+        if (ids.length) el.setAttribute("aria-describedby", ids.join(" "));
+        else el.removeAttribute("aria-describedby");
+      };
+
+      const validateCustomRules = (el) => {
+        if (el === messageInput) {
+          if (messageInput.value.length > 0 && messageInput.value.trim().length === 0) {
+            messageInput.setCustomValidity("Veuillez saisir un message non vide.");
+          } else {
+            messageInput.setCustomValidity("");
+          }
+        }
+      };
+
+      const announced = new WeakSet();
+      const edited = new WeakSet();
+      const dirty = new WeakSet();
+
+      const syncFieldState = (el, { forceShow = false, announce = false } = {}) => {
+        if (!el || !el.matches?.("input, textarea")) return;
+        if (el.type === "hidden" || el.type === "radio" || el.type === "checkbox") return;
+
+        validateCustomRules(el);
+        if (forceShow) dirty.add(el);
+
+        const showInvalid = (dirty.has(el) || el.matches(":user-invalid")) && !el.validity.valid;
+        el.classList.toggle("is-invalid", showInvalid);
+        el.setAttribute("aria-invalid", showInvalid ? "true" : "false");
+        linkError(el, showInvalid);
+
+        if (showInvalid && announce && !announced.has(el)) {
+          const errEl = document.getElementById(el.dataset.error);
+          if (errEl) {
+            const msg = errEl.textContent.replace(/\s+/g, " ").trim();
+            clearTimeout(announceTimer);
+            announcer.textContent = "";
+            announcedField = el;
+            announceTimer = setTimeout(() => {
+              announcer.textContent = msg;
+            }, 350);
+          }
+          announced.add(el);
+        } else if (!showInvalid) {
+          announced.delete(el);
+          if (announcedField === el) {
+            clearTimeout(announceTimer);
+            announcer.textContent = "";
+          }
+        }
+      };
+
+      form.addEventListener("change", (e) => {
+        if (e.target.name === "type") {
+          syncContextFields();
+        }
+      });
+
+      [emailInput, messageInput].forEach((field) => {
+        field.addEventListener("blur", () => {
+          if (edited.has(field) || dirty.has(field)) {
+            syncFieldState(field, { forceShow: true, announce: true });
+          }
+        });
+        field.addEventListener("input", () => {
+          edited.add(field);
+          syncFieldState(field, { forceShow: false, announce: false });
+          if (!statusBox.hidden) {
+            statusBox.hidden = true;
+            statusBox.textContent = "";
+          }
+        });
+      });
+
+      // Raccourci Cmd+Enter / Ctrl+Enter depuis le textarea (hors composition IME)
+      messageInput.addEventListener("keydown", (e) => {
+        if (e.isComposing) return;
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      const setSubmitting = (pending) => {
+        submitBtn.disabled = pending;
+        if (pending) {
+          submitBtn.replaceChildren();
+          const spinner = document.createElement("span");
+          spinner.className = "spinner";
+          spinner.setAttribute("aria-hidden", "true");
+          const label = document.createElement("span");
+          label.textContent = "Envoi…";
+          submitBtn.append(spinner, label);
+        } else {
+          submitBtn.textContent = "Envoyer";
+        }
+      };
+
+      const showError = (message) => {
+        statusBox.textContent = `❌ ${message}`;
+        statusBox.hidden = false;
+      };
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        statusBox.hidden = true;
+        statusBox.textContent = "";
+        syncContextFields();
+
+        [emailInput, messageInput].forEach((field) =>
+          syncFieldState(field, { forceShow: true, announce: false })
+        );
+
+        const firstInvalid = [emailInput, messageInput].find((field) => !field.validity.valid);
+        if (firstInvalid) {
+          firstInvalid.focus();
+          return;
+        }
+
+        const payload = new FormData(form);
+        const trimmedEmail = String(payload.get("email") || "").trim();
+        if (!trimmedEmail) {
+          payload.delete("email");
+        } else {
+          payload.set("email", trimmedEmail);
+          payload.set("replyto", trimmedEmail);
+        }
+        payload.set("message", messageInput.value.trim());
+
+        setSubmitting(true);
+        try {
+          const response = await fetch(ENDPOINT, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            body: payload,
+          });
+
+          const data = await response.json().catch(() => null);
+          if (response.ok && data && data.success === true) {
+            form.hidden = true;
+            successPanel.hidden = false;
+            document.title = "Merci ! — Shake'n'Drop";
+            successPanel.focus();
+          } else {
+            const detail =
+              data && typeof data.message === "string" && data.message.trim()
+                ? data.message.trim()
+                : `erreur serveur (${response.status || "inconnue"})`;
+            showError(`Impossible d'envoyer le message (${detail}). Réessayez ou écrivez à support@webomatik.fr.`);
+          }
+        } catch {
+          showError("Connexion impossible. Vérifiez votre accès internet ou écrivez à support@webomatik.fr.");
+        } finally {
+          setSubmitting(false);
+        }
+      });
+
+      resetBtn.addEventListener("click", () => {
+        const wasBug = bugRadio.checked;
+        const savedEmail = emailInput.value.trim();
+        form.reset();
+        appVersionInput.value = cleanVersion || "Non renseignée";
+        osVersionInput.value = osVersion || "Non renseignée";
+        bugRadio.checked = wasBug;
+        ideaRadio.checked = !wasBug;
+        emailInput.value = savedEmail;
+
+        [emailInput, messageInput].forEach((field) => {
+          edited.delete(field);
+          dirty.delete(field);
+          announced.delete(field);
+          field.setCustomValidity("");
+          field.classList.remove("is-invalid");
+          field.setAttribute("aria-invalid", "false");
+          linkError(field, false);
+        });
+        statusBox.hidden = true;
+        statusBox.textContent = "";
+        successPanel.hidden = true;
+        form.hidden = false;
+        document.title = "Idée ou bug ? — Shake'n'Drop";
+        syncContextFields();
+        messageInput.focus();
+      });
+    })();
+  </script>
+</body>
+</html>
