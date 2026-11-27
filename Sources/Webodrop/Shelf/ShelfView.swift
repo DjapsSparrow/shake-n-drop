@@ -24,8 +24,7 @@ struct ShelfView: View {
     }
 
     private var fullShelfView: some View {
-        let isPendingDock = shelf.pendingDockEdge != nil
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             headerBar
 
             if shelf.items.isEmpty {
@@ -49,13 +48,12 @@ struct ShelfView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(
-                    (shelf.isDropTargeted || isPendingDock) ? Palette.accent : Color.primary.opacity(0.14),
-                    lineWidth: (shelf.isDropTargeted || isPendingDock) ? 2.5 : 1
+                    shelf.isDropTargeted ? Palette.accent : Color.primary.opacity(0.14),
+                    lineWidth: shelf.isDropTargeted ? 2.5 : 1
                 )
         }
         .scaleEffect(shelf.isDropTargeted ? 1.03 : 1.0)
         .animation(.spring(response: 0.24, dampingFraction: 0.78), value: shelf.isDropTargeted)
-        .animation(.spring(response: 0.22, dampingFraction: 0.8), value: isPendingDock)
         .animation(.spring(response: 0.25, dampingFraction: 0.84), value: shelf.items.count)
     }
 
@@ -126,11 +124,25 @@ struct ShelfView: View {
 
     // MARK: - En-tête
 
+    private var dockButtonSymbol: String {
+        if let docked = shelf.dockedEdge {
+            return docked == .left ? "arrow.right.to.line" : "arrow.left.to.line"
+        }
+        return shelf.nearestEdge == .left ? "arrow.left.to.line" : "arrow.right.to.line"
+    }
+
+    private var dockButtonHelp: String {
+        if shelf.dockedEdge != nil {
+            return "Détacher du bord"
+        }
+        return shelf.nearestEdge == .left ? "Ranger sur le bord gauche" : "Ranger sur le bord droit"
+    }
+
     private var headerBar: some View {
         ZStack {
             WindowDragHandle()
 
-            HStack(spacing: Space.xs) {
+            HStack(spacing: 2) {
                 Button {
                     shelf.isPinned.toggle()
                 } label: {
@@ -143,16 +155,21 @@ struct ShelfView: View {
                 .buttonStyle(.plain)
                 .help(shelf.isPinned ? "Désépingler (l'étagère pourra se fermer après dépôt)" : "Épingler (garder ouverte après dépôt)")
 
+                Button {
+                    engine.panels[shelf.id]?.toggleDockToNearestEdge()
+                } label: {
+                    Image(systemName: dockButtonSymbol)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(shelf.dockedEdge != nil ? Palette.accent : .secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(dockButtonHelp)
+
                 Spacer(minLength: 4)
 
-                if let pending = shelf.pendingDockEdge {
-                    Text(pending == .left ? "← Ranger à gauche" : "Ranger à droite →")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Palette.accent)
-                        .lineLimit(1)
-                        .transition(.opacity)
-                        .allowsHitTesting(false)
-                } else if let message = shelf.statusMessage {
+                if let message = shelf.statusMessage {
                     Text(message)
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
@@ -162,7 +179,7 @@ struct ShelfView: View {
                 } else {
                     Capsule()
                         .fill(Color.primary.opacity(0.22))
-                        .frame(width: 32, height: 4)
+                        .frame(width: 28, height: 4)
                         .allowsHitTesting(false)
                 }
 

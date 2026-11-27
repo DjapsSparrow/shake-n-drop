@@ -10,7 +10,6 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
     private var quickLookIndex: Int = 0
     private var collapseTask: Task<Void, Never>?
 
-    private static let edgeSnapThreshold: CGFloat = 22
     private static let dockedPillSize = NSSize(width: 40, height: 96)
     private var isUserDraggingWindow: Bool = false
     private var moveObserver: NSObjectProtocol?
@@ -50,7 +49,7 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.updatePendingDockEdgeIfDragging()
+                self?.updateNearestEdge()
             }
         }
     }
@@ -111,24 +110,30 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         contentView?.frame = NSRect(origin: .zero, size: newSize)
     }
 
-    /// Met à jour `shelf.pendingDockEdge` en temps réel pendant que l'utilisateur déplace l'étagère.
-    private func updatePendingDockEdgeIfDragging() {
-        guard isUserDraggingWindow else { return }
+    /// Met à jour `shelf.nearestEdge` selon que l'étagère se trouve dans la moitié gauche ou droite de l'écran.
+    func updateNearestEdge() {
         let currentScreen = screen ?? NSScreen.main
         guard let visible = currentScreen?.visibleFrame else { return }
-        let distLeft = frame.minX - visible.minX
-        let distRight = visible.maxX - frame.maxX
-
-        if distLeft <= Self.edgeSnapThreshold {
-            shelf.pendingDockEdge = .left
-        } else if distRight <= Self.edgeSnapThreshold {
-            shelf.pendingDockEdge = .right
-        } else {
-            shelf.pendingDockEdge = nil
+        let edge: DockEdge = frame.midX < visible.midX ? .left : .right
+        if shelf.nearestEdge != edge {
+            shelf.nearestEdge = edge
         }
     }
 
-    /// Appelé juste avant `performDrag(with:)` : annule tout repli et détache l'étagère du bord.
+    /// Bouton dédié dans l'en-tête : range l'étagère sur le bord le plus proche, ou la détache si déjà rangée.
+    func toggleDockToNearestEdge() {
+        if let edge = shelf.dockedEdge {
+            undockFromEdge(from: edge)
+        } else {
+            updateNearestEdge()
+            collapseTask?.cancel()
+            shelf.dockedEdge = shelf.nearestEdge
+            shelf.isEdgePeeked = false
+            animateToDockedFrame()
+        }
+    }
+
+    /// Appelé juste avant `performDrag(with:)` : détache l'étagère si elle était rangée sur un bord.
     func handleWindowDragStarted() {
         isUserDraggingWindow = true
         collapseTask?.cancel()
@@ -143,31 +148,18 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
                 contentView?.frame = NSRect(origin: .zero, size: fullSize)
             }
         }
-        updatePendingDockEdgeIfDragging()
     }
 
-    /// Appelé juste après `performDrag(with:)` : aimante l'étagère au bord gauche/droit
-    /// si l'indicateur de bord était actif au moment du relâchement.
+    /// Appelé juste après `performDrag(with:)` : met simplement à jour le côté le plus proche (aucun collage auto).
     func handleWindowDragFinished() {
         isUserDraggingWindow = false
-        let chosenEdge = shelf.pendingDockEdge
-        shelf.pendingDockEdge = nil
-
-        if let edge = chosenEdge {
-            shelf.dockedEdge = edge
-            shelf.isEdgePeeked = false
-            animateToDockedFrame()
-        } else {
-            shelf.dockedEdge = nil
-            shelf.isEdgePeeked = false
-        }
+        updateNearestEdge()
     }
 
-    /// Détache explicitement une étagère du bord (ex: simple clic sur la languette ou la barre du haut).
+    /// Détache explicitement une étagère du bord (clic sur la languette ou sur le bouton de l'en-tête).
     func undockFromEdge(from edge: DockEdge) {
         isUserDraggingWindow = false
         collapseTask?.cancel()
-        shelf.pendingDockEdge = nil
         shelf.dockedEdge = nil
         shelf.isEdgePeeked = false
 
@@ -186,6 +178,7 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
             animator().setFrame(target, display: true)
         }
         contentView?.frame = NSRect(origin: .zero, size: fullSize)
+        updateNearestEdge()
     }
 
     /// Fait ressortir ou replier une étagère aimantée au bord d'écran au survol de la souris / d'un drag.
@@ -254,6 +247,7 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         )
         let rect = clampedToScreen(NSRect(origin: rawOrigin, size: size))
         setFrame(rect, display: true)
+        updateNearestEdge()
     }
 
     private func clampedToScreen(_ rect: NSRect) -> NSRect {
