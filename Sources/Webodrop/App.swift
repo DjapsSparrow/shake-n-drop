@@ -35,11 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Au tout premier lancement, affiche le guide rapide ; sinon ouvre une étagère prête.
+        // Au tout premier lancement, affiche le parcours d'installation ; ensuite démarre discrètement en barre de menu.
         if !engine.hasCompletedOnboarding {
             engine.openOnboarding()
-        } else if engine.shelves.isEmpty {
-            engine.summonShelfNearCursor(reuseEmpty: false)
         }
     }
 

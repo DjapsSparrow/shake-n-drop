@@ -84,6 +84,14 @@ struct SettingsView: View {
                     }
                     .disabled(engine.updater.isChecking || engine.updater.isInstalling)
                 }
+
+                HStack {
+                    Text("Guide de démarrage")
+                    Spacer()
+                    Button("Rouvrir l'assistant") {
+                        engine.openOnboarding()
+                    }
+                }
             }
 
             Section("Support & Idées") {

@@ -109,22 +109,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
+        if let update = engine.updater.availableUpdate {
+            let updateItem = NSMenuItem(
+                title: "Mettre à jour vers v\(update.version)…",
+                action: #selector(checkForUpdates),
+                keyEquivalent: ""
+            )
+            updateItem.target = self
+            menu.addItem(updateItem)
+        }
+
         let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
-
-        let guide = NSMenuItem(title: "Guide de démarrage…", action: #selector(openOnboarding), keyEquivalent: "")
-        guide.target = self
-        menu.addItem(guide)
-
-        let updateTitle = if let update = engine.updater.availableUpdate {
-            "Mettre à jour vers v\(update.version)…"
-        } else {
-            "Rechercher des mises à jour…"
-        }
-        let checkUpdates = NSMenuItem(title: updateTitle, action: #selector(checkForUpdates), keyEquivalent: "")
-        checkUpdates.target = self
-        menu.addItem(checkUpdates)
 
         let feedbackMenu = NSMenu()
         let suggestIdea = NSMenuItem(title: "Suggérer une idée…", action: #selector(sendIdea), keyEquivalent: "")
