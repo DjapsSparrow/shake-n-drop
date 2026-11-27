@@ -19,6 +19,7 @@ struct SettingsView: View {
                 .tag(SettingsTab.appearance)
                 .tabItem { Label(SettingsTab.appearance.title, systemImage: SettingsTab.appearance.symbol) }
         }
+        .padding(.top, Space.md)
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
     }
