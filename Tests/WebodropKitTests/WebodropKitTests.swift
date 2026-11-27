@@ -70,3 +70,10 @@ import Testing
 @Test func shortcutPresetsContainDefault() {
     #expect(ShortcutConfig.presets.contains(ShortcutConfig.defaultShelf))
 }
+
+@Test func versionCompareOrdersSemver() {
+    #expect(VersionCompare.isNewer("v1.0.1", than: "1.0.0"))
+    #expect(VersionCompare.isNewer("1.2", than: "1.1.9"))
+    #expect(!VersionCompare.isNewer("v1.0.0", than: "1.0"))
+    #expect(!VersionCompare.isNewer("1.0.0", than: "1.0.1"))
+}

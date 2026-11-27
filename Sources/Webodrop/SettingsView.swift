@@ -64,6 +64,27 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("Mises à jour") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Version \(engine.updater.currentVersion)")
+                            .font(.callout.weight(.medium))
+                        if !engine.updater.statusText.isEmpty {
+                            Text(engine.updater.statusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button(engine.updater.isChecking ? "Recherche…" : "Rechercher des mises à jour") {
+                        Task {
+                            await engine.updater.checkForUpdates(interactive: true)
+                        }
+                    }
+                    .disabled(engine.updater.isChecking || engine.updater.isInstalling)
+                }
+            }
         }
         .formStyle(.grouped)
         .onAppear {

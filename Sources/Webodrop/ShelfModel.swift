@@ -215,6 +215,7 @@ final class WebodropEngine {
     @ObservationIgnored let shakeMonitor = ShakeMonitor()
     @ObservationIgnored let hotkey = GlobalHotkey()
     @ObservationIgnored let permissions = PermissionMonitor()
+    @ObservationIgnored let updater = UpdateChecker()
     @ObservationIgnored var statusBar: StatusBarController?
 
     private enum Keys {
@@ -277,6 +278,10 @@ final class WebodropEngine {
         hotkey.register(shortcut)
 
         permissions.startMonitoring()
+
+        if !SelfTest.requested && !Snapshot.requested {
+            updater.scheduleBackgroundCheckIfNeeded()
+        }
     }
 
     func applyActivationPolicy() {

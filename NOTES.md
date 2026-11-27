@@ -17,6 +17,7 @@
   - Drag-in universel : fichiers, dossiers, images en mémoire, URLs web (`.webloc`), extraits de texte (`.txt`).
   - Mode Pile (Stack avec vignettes inclinées + badge) et Mode Liste étendue.
   - Drag-out groupé (toute la pile d'un coup via `NSDraggingSession`) ou individuel + auto-fermeture après dépôt (sauf si épinglée).
+- **Mises à jour automatiques (`UpdateChecker`) :** Vérification via GitHub Releases (`DjapsSparrow/shake-n-drop`), téléchargement & remplacement automatique, script `./tools/release.sh <version> "<notes>"`.
 - **Actions intégrées :** Quick Look (`Espace` ou clic), Partage natif (`NSSharingServicePicker` : AirDrop/Mail/Messages), Compression ZIP (`/usr/bin/ditto`), Copier, Révéler dans le Finder.
 
 ## Validation

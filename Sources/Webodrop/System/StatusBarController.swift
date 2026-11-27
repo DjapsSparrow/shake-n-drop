@@ -113,6 +113,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         settings.target = self
         menu.addItem(settings)
 
+        let updateTitle = if let update = engine.updater.availableUpdate {
+            "Mettre à jour vers v\(update.version)…"
+        } else {
+            "Rechercher des mises à jour…"
+        }
+        let checkUpdates = NSMenuItem(title: updateTitle, action: #selector(checkForUpdates), keyEquivalent: "")
+        checkUpdates.target = self
+        menu.addItem(checkUpdates)
+
         let quit = NSMenuItem(title: "Quitter Shake'n'Drop", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
@@ -142,6 +151,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() {
         engine?.openSettings()
+    }
+
+    @objc private func checkForUpdates() {
+        guard let updater = engine?.updater else { return }
+        if let available = updater.availableUpdate {
+            updater.promptToInstall(available)
+        } else {
+            Task {
+                await updater.checkForUpdates(interactive: true)
+            }
+        }
     }
 
     @objc private func quitApp() {
