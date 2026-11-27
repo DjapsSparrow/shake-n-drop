@@ -2,10 +2,11 @@ import AppKit
 import Foundation
 
 /// Envoie les idées d'amélioration et signalements de bugs vers `support@webomatik.fr`
-/// via Formsubmit (sans clé secrète dans l'app), avec fallback `mailto:` si besoin.
+/// via Web3Forms (clé publique prévue pour les clients front-end/apps), avec fallback `mailto:`.
 enum FeedbackHelper {
     nonisolated static let supportEmail = "support@webomatik.fr"
-    nonisolated static let formsubmitEndpoint = "https://formsubmit.co/ajax/support@webomatik.fr"
+    nonisolated static let web3FormsEndpoint = "https://api.web3forms.com/submit"
+    nonisolated static let web3FormsAccessKey = "93fed49f-f041-45f9-ad44-2760ca3441bb"
 
     enum Kind: String, CaseIterable, Identifiable, Sendable {
         case idea
@@ -41,7 +42,7 @@ enum FeedbackHelper {
         message: String,
         appVersion: String
     ) async throws {
-        guard let url = URL(string: formsubmitEndpoint) else {
+        guard let url = URL(string: web3FormsEndpoint) else {
             throw NSError(domain: "ShakeNDrop.Feedback", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "Adresse d'envoi invalide."
             ])
@@ -51,17 +52,17 @@ enum FeedbackHelper {
         let trimmedEmail = senderEmail.trimmingCharacters(in: .whitespacesAndNewlines)
 
         var payload: [String: String] = [
-            "_subject": "[Shake'n'Drop v\(appVersion)] \(kind.title)",
-            "_template": "table",
-            "_captcha": "false",
-            "Type": kind.title,
-            "Message": message.trimmingCharacters(in: .whitespacesAndNewlines),
-            "Version App": "Shake'n'Drop v\(appVersion)",
-            "macOS": macOSVersion,
+            "access_key": web3FormsAccessKey,
+            "subject": "[Shake'n'Drop v\(appVersion)] \(kind.title)",
+            "from_name": "Shake'n'Drop App",
+            "type": kind.title,
+            "message": message.trimmingCharacters(in: .whitespacesAndNewlines),
+            "app_version": "Shake'n'Drop v\(appVersion)",
+            "macos_version": macOSVersion,
         ]
         if !trimmedEmail.isEmpty {
-            payload["Email"] = trimmedEmail
-            payload["_replyto"] = trimmedEmail
+            payload["email"] = trimmedEmail
+            payload["replyto"] = trimmedEmail
         }
 
         var request = URLRequest(url: url)
@@ -69,14 +70,23 @@ enum FeedbackHelper {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("https://github.com/DjapsSparrow/shake-n-drop", forHTTPHeaderField: "Referer")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw NSError(domain: "ShakeNDrop.Feedback", code: code, userInfo: [
                 NSLocalizedDescriptionKey: "Le serveur n'a pas accepté l'envoi (code \(code))."
+            ])
+        }
+
+        struct Web3Response: Decodable {
+            let success: Bool
+            let message: String?
+        }
+        if let decoded = try? JSONDecoder().decode(Web3Response.self, from: data), !decoded.success {
+            throw NSError(domain: "ShakeNDrop.Feedback", code: -2, userInfo: [
+                NSLocalizedDescriptionKey: decoded.message ?? "Envoi refusé par Web3Forms."
             ])
         }
     }
