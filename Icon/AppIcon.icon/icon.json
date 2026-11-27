@@ -1,15 +1,16 @@
 {
   "fill" : {
-    "automatic-gradient" : "srgb:0.20000,0.42000,0.96000,1.00000"
+    "automatic-gradient" : "srgb:0.33000,0.27000,0.93000,1.00000"
   },
   "groups" : [
     {
       "layers" : [
-        { "glass" : true, "image-name" : "front.svg", "name" : "front" },
-        { "glass" : true, "image-name" : "back.svg", "name" : "back", "opacity" : 0.6 }
+        { "glass" : true, "image-name" : "front.svg", "name" : "shelf-tray" },
+        { "glass" : true, "image-name" : "mid.svg", "name" : "front-card", "opacity" : 0.88 },
+        { "glass" : true, "image-name" : "back.svg", "name" : "shaken-cards", "opacity" : 0.52 }
       ],
       "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
-      "translucency" : { "enabled" : true, "value" : 0.5 }
+      "translucency" : { "enabled" : true, "value" : 0.55 }
     }
   ],
   "supported-platforms" : { "squares" : [ "macOS" ] }
