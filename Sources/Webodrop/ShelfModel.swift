@@ -622,6 +622,12 @@ final class WebodropEngine {
 
     func openQuickLook(for shelf: Shelf, startingAt index: Int = 0) {
         guard !shelf.items.isEmpty, let panel = panels[shelf.id] else { return }
+        if shelf.items.indices.contains(index),
+           shelf.items[index].kind == .url,
+           let webURL = shelf.items[index].originalWebURL {
+            NSWorkspace.shared.open(webURL)
+            return
+        }
         panel.showQuickLook(startingAt: index)
     }
 
@@ -665,21 +671,33 @@ final class WebodropEngine {
             return result
         }
 
-        // 3. Lien web (http/https)
-        if let urlString = pasteboard.string(forType: .URL) ?? pasteboard.string(forType: .string),
+        // 3. Lien web (http/https) depuis Brave, Chrome, Safari, Arc, Firefox ou texte URL
+        let publicURLType = NSPasteboard.PasteboardType("public.url")
+        let publicURLNameType = NSPasteboard.PasteboardType("public.url-name")
+        let rawURLString = pasteboard.string(forType: publicURLType)
+            ?? pasteboard.string(forType: .URL)
+            ?? pasteboard.string(forType: .string)
+
+        if let urlString = rawURLString,
            let webURL = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)),
            let scheme = webURL.scheme?.lowercased(),
            scheme == "http" || scheme == "https" {
-            if let weblocURL = saveTemporaryWebloc(url: webURL) {
-                result.append(ShelfItem(
+            let pageTitle = pasteboard.string(forType: publicURLNameType)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayTitle = (pageTitle?.isEmpty == false ? pageTitle! : nil)
+                ?? webURL.host
+                ?? webURL.absoluteString
+            if let weblocURL = saveTemporaryWebloc(url: webURL, title: displayTitle) {
+                let item = ShelfItem(
                     kind: .url,
                     fileURL: weblocURL,
                     originalWebURL: webURL,
-                    title: webURL.host ?? webURL.absoluteString,
+                    title: displayTitle,
                     byteSize: Self.fileByteSize(at: weblocURL),
                     isTemporaryFile: true,
                     thumbnail: NSWorkspace.shared.icon(for: .internetLocation)
-                ))
+                )
+                result.append(item)
                 return result
             }
         }
@@ -728,6 +746,10 @@ final class WebodropEngine {
     }
 
     func loadThumbnail(for item: ShelfItem) {
+        if item.kind == .url, let host = item.originalWebURL?.host, !host.isEmpty {
+            loadFavicon(for: item, host: host)
+            return
+        }
         let url = item.fileURL
         let request = QLThumbnailGenerator.Request(
             fileAt: url,
@@ -740,6 +762,18 @@ final class WebodropEngine {
             Task { @MainActor in
                 item.thumbnail = nsImage
             }
+        }
+    }
+
+    private func loadFavicon(for item: ShelfItem, host: String) {
+        guard let encodedHost = host.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let faviconURL = URL(string: "https://www.google.com/s2/favicons?domain=\(encodedHost)&sz=128") else { return }
+        Task {
+            guard let (data, response) = try? await URLSession.shared.data(from: faviconURL),
+                  let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let image = NSImage(data: data),
+                  image.size.width >= 16 else { return }
+            item.thumbnail = image
         }
     }
 
@@ -776,9 +810,9 @@ final class WebodropEngine {
         }
     }
 
-    private func saveTemporaryWebloc(url webURL: URL) -> URL? {
-        let host = webURL.host ?? "Lien"
-        let name = ShelfFormatting.sanitizedFilename(from: host, fallback: "Lien", extension: "webloc")
+    private func saveTemporaryWebloc(url webURL: URL, title: String? = nil) -> URL? {
+        let preferred = (title?.isEmpty == false ? title! : nil) ?? webURL.host ?? "Lien"
+        let name = ShelfFormatting.sanitizedFilename(from: preferred, fallback: "Lien", extension: "webloc")
         let fileURL = tempDirectory().appending(path: name)
         let plist: [String: String] = ["URL": webURL.absoluteString]
         do {

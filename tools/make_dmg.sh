@@ -3,7 +3,7 @@
 # et le raccourci Applications (le parcours d'installation guidé est directement intégré dans l'app).
 set -euo pipefail
 
-app_src="/Applications/Shake'n'Drop.app"
+app_src="${APP_DEST:-/Applications/Shake'n'Drop.app}"
 dmg_out="/tmp/ShakeNDrop.dmg"
 staging=$(mktemp -d /tmp/shakendrop-dmg.XXXXXX)
 trap 'rm -rf "$staging"' EXIT

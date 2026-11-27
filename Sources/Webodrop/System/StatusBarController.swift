@@ -277,7 +277,7 @@ private final class StatusBarDropView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        registerForDraggedTypes([.fileURL, .URL, .string, .png, .tiff])
+        registerForDraggedTypes([.fileURL, .URL, NSPasteboard.PasteboardType("public.url"), .string, .png, .tiff])
     }
 
     @available(*, unavailable)

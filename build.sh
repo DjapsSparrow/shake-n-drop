@@ -38,8 +38,11 @@ if [[ -n "$stale" ]]; then
   exit 1
 fi
 
-app="/Applications/$app_name.app"
-rm -rf "$HOME/Applications/$name.app" "$HOME/Applications/$app_name.app"
+app="${APP_DEST:-/Applications/$app_name.app}"
+if [[ -z "${APP_DEST:-}" ]]; then
+  rm -rf "$HOME/Applications/$name.app" "$HOME/Applications/$app_name.app"
+fi
+mkdir -p "$(dirname "$app")"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/$name"
