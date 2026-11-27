@@ -177,13 +177,14 @@ struct OnboardingView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: 380)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: Space.md) {
-                tipBadge(symbol: "hand.wave.fill", label: "Secouer")
-                tipBadge(symbol: "command", label: engine.shortcut.displayLabel)
-                tipBadge(symbol: "sidebar.right", label: "Aimant bords")
+                tipBadge(symbol: "hand.wave.fill", label: "Secouer", help: "Secouez le curseur en glissant un fichier ou un lien")
+                tipBadge(symbol: "command", label: engine.shortcut.displayLabel, help: "Ouvre une étagère instantanément au clavier")
+                tipBadge(symbol: "sidebar.right", label: "Repli bord", help: "Poussez une étagère contre le bord gauche ou droit pour la ranger")
             }
 
             Spacer(minLength: 0)
@@ -214,7 +215,7 @@ struct OnboardingView: View {
         }
     }
 
-    private func tipBadge(symbol: String, label: String) -> some View {
+    private func tipBadge(symbol: String, label: String, help: String) -> some View {
         VStack(spacing: 4) {
             Image(systemName: symbol)
                 .font(.system(size: 16, weight: .semibold))
@@ -223,11 +224,12 @@ struct OnboardingView: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
         }
-        .frame(width: 96, height: 54)
+        .frame(width: 104, height: 54)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.primary.opacity(0.05))
         )
+        .help(help)
     }
 
     // MARK: - Copie réelle dans /Applications + ajout optionnel au Dock
