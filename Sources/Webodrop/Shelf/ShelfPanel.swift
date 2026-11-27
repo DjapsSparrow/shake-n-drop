@@ -10,8 +10,9 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
     private var quickLookIndex: Int = 0
     private var collapseTask: Task<Void, Never>?
 
-    private static let edgeSnapThreshold: CGFloat = 28
+    private static let edgeSnapThreshold: CGFloat = 12
     private static let dockedVisibleWidth: CGFloat = 32
+    private var isUserDraggingWindow: Bool = false
 
     init(shelf: Shelf, engine: WebodropEngine, compact: Bool) {
         self.shelf = shelf
@@ -96,13 +97,30 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         contentView?.frame = NSRect(origin: .zero, size: newSize)
     }
 
-    /// Appelé juste après `performDrag(with:)` : aimante l'étagère au bord gauche/droit si elle en est proche.
+    /// Appelé juste avant `performDrag(with:)` : annule tout repli et détache l'étagère du bord.
+    func handleWindowDragStarted() {
+        isUserDraggingWindow = true
+        collapseTask?.cancel()
+        if let edge = shelf.dockedEdge {
+            // Si elle était repliée en languette, on la ramène entièrement à l'écran avant le drag.
+            if !shelf.isEdgePeeked {
+                let unpeeked = dockedFrame(for: edge, size: frame.size, peeked: true, currentY: frame.origin.y)
+                setFrame(unpeeked, display: true)
+            }
+            shelf.dockedEdge = nil
+            shelf.isEdgePeeked = false
+        }
+    }
+
+    /// Appelé juste après `performDrag(with:)` : aimante l'étagère au bord gauche/droit
+    /// uniquement si l'utilisateur l'a volontairement poussée contre le bord.
     func handleWindowDragFinished() {
+        isUserDraggingWindow = false
         let currentScreen = screen ?? NSScreen.main
         guard let visible = currentScreen?.visibleFrame else { return }
 
-        let distLeft = abs(frame.minX - visible.minX)
-        let distRight = abs(visible.maxX - frame.maxX)
+        let distLeft = frame.minX - visible.minX
+        let distRight = visible.maxX - frame.maxX
 
         if distLeft <= Self.edgeSnapThreshold {
             shelf.dockedEdge = .left
@@ -118,9 +136,28 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         }
     }
 
+    /// Détache explicitement une étagère du bord (ex: simple clic sur la barre du haut ou la languette).
+    func undockFromEdge(from edge: DockEdge) {
+        isUserDraggingWindow = false
+        collapseTask?.cancel()
+        let currentScreen = screen ?? NSScreen.main
+        let visible = currentScreen?.visibleFrame ?? frame
+        let targetX: CGFloat = edge == .left
+            ? visible.minX + 40
+            : visible.maxX - frame.width - 40
+        let target = NSRect(origin: NSPoint(x: targetX, y: frame.origin.y), size: frame.size)
+        shelf.dockedEdge = nil
+        shelf.isEdgePeeked = false
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.22
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            animator().setFrame(target, display: true)
+        }
+    }
+
     /// Fait ressortir ou replier une étagère aimantée au bord d'écran au survol de la souris / d'un drag.
     func setEdgePeeked(_ peeked: Bool) {
-        guard shelf.dockedEdge != nil else { return }
+        guard shelf.dockedEdge != nil, !isUserDraggingWindow else { return }
         collapseTask?.cancel()
 
         if peeked {
@@ -130,10 +167,9 @@ final class ShelfPanel: NSPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegat
             }
         } else {
             collapseTask = Task {
-                try? await Task.sleep(for: .seconds(0.28))
+                try? await Task.sleep(for: .seconds(0.32))
                 guard !Task.isCancelled else { return }
-                guard self.shelf.dockedEdge != nil, !self.shelf.isDropTargeted else { return }
-                // Ne replie pas si la souris est encore dans la fenêtre.
+                guard self.shelf.dockedEdge != nil, !self.isUserDraggingWindow, !self.shelf.isDropTargeted else { return }
                 if self.frame.contains(NSEvent.mouseLocation) { return }
                 self.shelf.isEdgePeeked = false
                 self.animateToDockedFrame()

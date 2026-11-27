@@ -214,11 +214,16 @@ final class WindowDragNSView: NSView {
             window?.performDrag(with: event)
             return
         }
-        // Si l'étagère était repliée sur un bord, on la déploie d'abord pour la déplacer confortablement.
-        if panel.shelf.dockedEdge != nil && !panel.shelf.isEdgePeeked {
-            panel.setEdgePeeked(true)
-        }
+        let previousEdge = panel.shelf.dockedEdge
+        let startOrigin = panel.frame.origin
+        panel.handleWindowDragStarted()
         panel.performDrag(with: event)
+        let movedDistance = hypot(panel.frame.origin.x - startOrigin.x, panel.frame.origin.y - startOrigin.y)
+        if let edge = previousEdge, movedDistance < 6 {
+            // Simple clic sur une étagère aimantée : la détache proprement vers l'écran.
+            panel.undockFromEdge(from: edge)
+            return
+        }
         panel.handleWindowDragFinished()
     }
 }
