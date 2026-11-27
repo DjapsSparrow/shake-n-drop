@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import WebodropKit
 
 /// Vérifie et installe automatiquement les mises à jour de Shake'n'Drop depuis GitHub Releases.
