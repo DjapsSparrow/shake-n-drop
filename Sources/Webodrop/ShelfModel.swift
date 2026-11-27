@@ -213,6 +213,7 @@ final class WebodropEngine {
     @ObservationIgnored var panels: [UUID: ShelfPanel] = [:]
     @ObservationIgnored private var settingsWindow: NSWindow?
     @ObservationIgnored private var onboardingWindow: NSWindow?
+    @ObservationIgnored private var feedbackWindow: NSWindow?
     @ObservationIgnored let shakeMonitor = ShakeMonitor()
     @ObservationIgnored let hotkey = GlobalHotkey()
     @ObservationIgnored let permissions = PermissionMonitor()
@@ -359,6 +360,32 @@ final class WebodropEngine {
         window.center()
         windowRef = window
         onboardingWindow = window
+
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func openFeedback(initialKind: FeedbackHelper.Kind = .idea) {
+        if let existing = feedbackWindow {
+            existing.close()
+            feedbackWindow = nil
+        }
+
+        var windowRef: NSWindow?
+        let rootView = FeedbackView(kind: initialKind) {
+            windowRef?.close()
+        }
+        .environment(self)
+        .themed()
+
+        let controller = NSHostingController(rootView: rootView)
+        let window = NSWindow(contentViewController: controller)
+        window.title = "Idée ou bug — Shake'n'Drop"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        windowRef = window
+        feedbackWindow = window
 
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)

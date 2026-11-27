@@ -43,7 +43,7 @@ struct OnboardingView: View {
 
             HStack {
                 Button("Suggérer une idée / Bug") {
-                    FeedbackHelper.openEmail(kind: .idea, appVersion: engine.updater.currentVersion)
+                    engine.openFeedback(initialKind: .idea)
                 }
                 .buttonStyle(.link)
                 .font(.caption)

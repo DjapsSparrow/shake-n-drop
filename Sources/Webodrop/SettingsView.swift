@@ -89,14 +89,14 @@ struct SettingsView: View {
             Section("Support & Idées") {
                 HStack {
                     Button("Suggérer une idée", systemImage: "lightbulb") {
-                        FeedbackHelper.openEmail(kind: .idea, appVersion: engine.updater.currentVersion)
+                        engine.openFeedback(initialKind: .idea)
                     }
                     Spacer()
                     Button("Signaler un bug", systemImage: "ladybug") {
-                        FeedbackHelper.openEmail(kind: .bug, appVersion: engine.updater.currentVersion)
+                        engine.openFeedback(initialKind: .bug)
                     }
                 }
-                Text("Envoie un email pré-rempli à \(FeedbackHelper.supportEmail) avec votre version de macOS.")
+                Text("Ouvre le formulaire intégré et envoie votre retour à \(FeedbackHelper.supportEmail).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -176,11 +176,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func sendIdea() {
-        FeedbackHelper.openEmail(kind: .idea, appVersion: engine?.updater.currentVersion ?? "1.0.0")
+        engine?.openFeedback(initialKind: .idea)
     }
 
     @objc private func reportBug() {
-        FeedbackHelper.openEmail(kind: .bug, appVersion: engine?.updater.currentVersion ?? "1.0.0")
+        engine?.openFeedback(initialKind: .bug)
     }
 
     @objc private func checkForUpdates() {

@@ -1,55 +1,93 @@
 import AppKit
 import Foundation
 
-/// Ouvre le client mail par défaut pré-rempli vers `support@webomatik.fr`
-/// pour soumettre une idée d'amélioration ou signaler un bug.
+/// Envoie les idées d'amélioration et signalements de bugs vers `support@webomatik.fr`
+/// via Formsubmit (sans clé secrète dans l'app), avec fallback `mailto:` si besoin.
 enum FeedbackHelper {
-    static let supportEmail = "support@webomatik.fr"
+    nonisolated static let supportEmail = "support@webomatik.fr"
+    nonisolated static let formsubmitEndpoint = "https://formsubmit.co/ajax/support@webomatik.fr"
 
-    enum Kind {
+    enum Kind: String, CaseIterable, Identifiable, Sendable {
         case idea
         case bug
 
-        var subjectTag: String {
+        var id: String { rawValue }
+
+        var title: String {
             switch self {
             case .idea: "Idée d'amélioration"
-            case .bug: "Signalement de bug"
+            case .bug: "Signaler un bug"
             }
         }
 
-        var promptBody: String {
+        var symbol: String {
             switch self {
-            case .idea:
-                """
-                Bonjour l'équipe Webomatik,
+            case .idea: "lightbulb.fill"
+            case .bug: "ladybug.fill"
+            }
+        }
 
-                Voici une idée d'amélioration pour Shake'n'Drop :
-
-                [Décrivez votre idée ici]
-
-                """
-            case .bug:
-                """
-                Bonjour l'équipe Webomatik,
-
-                J'ai rencontré un bug dans Shake'n'Drop :
-
-                - Ce que je faisais :
-                - Ce qui s'est passé :
-                - Ce que j'attendais :
-
-                """
+        var placeholder: String {
+            switch self {
+            case .idea: "Décrivez la fonctionnalité ou l'amélioration que vous aimeriez voir dans Shake'n'Drop…"
+            case .bug: "Que faisiez-vous ? Que s'est-il passé ? (étapes pour reproduire le bug…)"
             }
         }
     }
 
-    static func openEmail(kind: Kind, appVersion: String) {
+    nonisolated static func send(
+        kind: Kind,
+        senderEmail: String,
+        message: String,
+        appVersion: String
+    ) async throws {
+        guard let url = URL(string: formsubmitEndpoint) else {
+            throw NSError(domain: "ShakeNDrop.Feedback", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Adresse d'envoi invalide."
+            ])
+        }
+
         let macOSVersion = ProcessInfo.processInfo.operatingSystemVersionString
-        let subject = "[Shake'n'Drop v\(appVersion)] \(kind.subjectTag)"
+        let trimmedEmail = senderEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var payload: [String: String] = [
+            "_subject": "[Shake'n'Drop v\(appVersion)] \(kind.title)",
+            "_template": "table",
+            "_captcha": "false",
+            "Type": kind.title,
+            "Message": message.trimmingCharacters(in: .whitespacesAndNewlines),
+            "Version App": "Shake'n'Drop v\(appVersion)",
+            "macOS": macOSVersion,
+        ]
+        if !trimmedEmail.isEmpty {
+            payload["Email"] = trimmedEmail
+            payload["_replyto"] = trimmedEmail
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("https://github.com/DjapsSparrow/shake-n-drop", forHTTPHeaderField: "Referer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw NSError(domain: "ShakeNDrop.Feedback", code: code, userInfo: [
+                NSLocalizedDescriptionKey: "Le serveur n'a pas accepté l'envoi (code \(code))."
+            ])
+        }
+    }
+
+    static func openEmailFallback(kind: Kind, message: String, appVersion: String) {
+        let macOSVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        let subject = "[Shake'n'Drop v\(appVersion)] \(kind.title)"
         let body = """
-        \(kind.promptBody)
+        \(message)
+
         ---
-        Diagnostic automatique :
         • App : Shake'n'Drop v\(appVersion)
         • macOS : \(macOSVersion)
         """
@@ -61,7 +99,6 @@ enum FeedbackHelper {
             URLQueryItem(name: "subject", value: subject),
             URLQueryItem(name: "body", value: body),
         ]
-
         if let url = components.url {
             NSWorkspace.shared.open(url)
         }
