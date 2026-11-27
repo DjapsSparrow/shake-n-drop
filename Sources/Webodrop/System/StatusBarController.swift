@@ -62,10 +62,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         guard let engine else { return }
 
         let newItem = NSMenuItem(
-            title: "Nouvelle étagère (\(engine.shortcut.displayLabel))",
+            title: "Nouvelle étagère",
             action: #selector(createShelf),
-            keyEquivalent: ""
+            keyEquivalent: Self.menuKeyEquivalent(for: engine.shortcut.keyCode)
         )
+        newItem.keyEquivalentModifierMask = Self.menuModifierMask(for: engine.shortcut.modifiers)
+        newItem.image = NSImage(systemSymbolName: "plus.square.on.square", accessibilityDescription: nil)
         newItem.target = self
         menu.addItem(newItem)
 
@@ -78,20 +80,23 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             for (index, shelf) in engine.shelves.enumerated() {
                 let label = "Étagère \(index + 1) — \(shelf.summaryTitle)"
                 let item = NSMenuItem(title: label, action: #selector(bringShelfForward(_:)), keyEquivalent: "")
+                item.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: nil)
                 item.target = self
                 item.representedObject = shelf.id
                 menu.addItem(item)
             }
 
             let toggleHide = NSMenuItem(
-                title: engine.shelvesHidden ? "Afficher les étagères" : "Masquer toutes les étagères",
+                title: engine.shelvesHidden ? "Afficher les étagères" : "Masquer les étagères",
                 action: #selector(toggleHideShelves),
                 keyEquivalent: ""
             )
+            toggleHide.image = NSImage(systemSymbolName: engine.shelvesHidden ? "eye" : "eye.slash", accessibilityDescription: nil)
             toggleHide.target = self
             menu.addItem(toggleHide)
 
-            let closeAll = NSMenuItem(title: "Fermer toutes les étagères", action: #selector(closeAllShelves), keyEquivalent: "")
+            let closeAll = NSMenuItem(title: "Tout fermer", action: #selector(closeAllShelves), keyEquivalent: "")
+            closeAll.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil)
             closeAll.target = self
             menu.addItem(closeAll)
         }
@@ -99,10 +104,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let shakeToggle = NSMenuItem(
-            title: "Secouer pour ouvrir (Shake)",
+            title: "Secouer pour ouvrir",
             action: #selector(toggleShake),
             keyEquivalent: ""
         )
+        shakeToggle.image = NSImage(systemSymbolName: "hand.wave", accessibilityDescription: nil)
         shakeToggle.target = self
         shakeToggle.state = engine.shakeEnabled ? .on : .off
         menu.addItem(shakeToggle)
@@ -115,29 +121,35 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 action: #selector(checkForUpdates),
                 keyEquivalent: ""
             )
+            updateItem.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
             updateItem.target = self
             menu.addItem(updateItem)
         }
 
         let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
         settings.target = self
         menu.addItem(settings)
 
         let feedbackMenu = NSMenu()
         let suggestIdea = NSMenuItem(title: "Suggérer une idée…", action: #selector(sendIdea), keyEquivalent: "")
+        suggestIdea.image = NSImage(systemSymbolName: "lightbulb", accessibilityDescription: nil)
         suggestIdea.target = self
         feedbackMenu.addItem(suggestIdea)
         let reportBug = NSMenuItem(title: "Signaler un bug…", action: #selector(reportBug), keyEquivalent: "")
+        reportBug.image = NSImage(systemSymbolName: "ladybug", accessibilityDescription: nil)
         reportBug.target = self
         feedbackMenu.addItem(reportBug)
 
         let feedbackItem = NSMenuItem(title: "Idée ou bug ?", action: nil, keyEquivalent: "")
+        feedbackItem.image = NSImage(systemSymbolName: "bubble.left.and.text.bubble.right", accessibilityDescription: nil)
         feedbackItem.submenu = feedbackMenu
         menu.addItem(feedbackItem)
 
         menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "Quitter Shake'n'Drop", action: #selector(quitApp), keyEquivalent: "q")
+        quit.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
         quit.target = self
         menu.addItem(quit)
     }
@@ -195,8 +207,26 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         NSApp.terminate(nil)
     }
 
+    private static func menuKeyEquivalent(for keyCode: UInt32) -> String {
+        switch keyCode {
+        case 2: "d"
+        case 1: "s"
+        case 49: " "
+        default: ""
+        }
+    }
+
+    private static func menuModifierMask(for carbonModifiers: UInt32) -> NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if (carbonModifiers & 2048) != 0 { flags.insert(.option) }
+        if (carbonModifiers & 512) != 0 { flags.insert(.shift) }
+        if (carbonModifiers & 4096) != 0 { flags.insert(.control) }
+        if (carbonModifiers & 256) != 0 { flags.insert(.command) }
+        return flags
+    }
+
     /// Dessine le picto monochrome template 18×18 assorti à l'icône Liquid Glass de Shake'n'Drop :
-    /// pile de cartes en éventail + berceau d'étagère en U arrondi.
+    /// contour fin aéré + pile de cartes en éventail + berceau d'étagère net.
     private static func makeMenuBarIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: true) { _ in
@@ -204,58 +234,55 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             ctx.setAllowsAntialiasing(true)
             ctx.setShouldAntialias(true)
 
-            // 1. Cartes arrière en éventail (opacité légère pour la profondeur en template)
+            // 1. Cartes arrière en éventail (légères, bien séparées du berceau)
             ctx.saveGState()
-            ctx.setFillColor(NSColor.black.withAlphaComponent(0.45).cgColor)
+            ctx.setStrokeColor(NSColor.black.withAlphaComponent(0.55).cgColor)
+            ctx.setLineWidth(1.25)
 
-            // Carte gauche inclinée (-15°)
             ctx.saveGState()
-            ctx.translateBy(x: 6.8, y: 6.2)
+            ctx.translateBy(x: 6.4, y: 5.8)
             ctx.rotate(by: -15 * .pi / 180)
-            let leftCard = CGPath(roundedRect: CGRect(x: -3.2, y: -3.4, width: 6.4, height: 6.8), cornerWidth: 1.4, cornerHeight: 1.4, transform: nil)
-            ctx.addPath(leftCard)
-            ctx.fillPath()
+            ctx.addPath(CGPath(roundedRect: CGRect(x: -2.6, y: -3.0, width: 5.2, height: 5.6), cornerWidth: 1.2, cornerHeight: 1.2, transform: nil))
+            ctx.strokePath()
             ctx.restoreGState()
 
-            // Carte droite inclinée (+15°)
             ctx.saveGState()
-            ctx.translateBy(x: 11.2, y: 6.2)
+            ctx.translateBy(x: 11.6, y: 5.8)
             ctx.rotate(by: 15 * .pi / 180)
-            let rightCard = CGPath(roundedRect: CGRect(x: -3.2, y: -3.4, width: 6.4, height: 6.8), cornerWidth: 1.4, cornerHeight: 1.4, transform: nil)
-            ctx.addPath(rightCard)
-            ctx.fillPath()
+            ctx.addPath(CGPath(roundedRect: CGRect(x: -2.6, y: -3.0, width: 5.2, height: 5.6), cornerWidth: 1.2, cornerHeight: 1.2, transform: nil))
+            ctx.strokePath()
             ctx.restoreGState()
             ctx.restoreGState()
 
-            // 2. Carte centrale principale
-            ctx.setFillColor(NSColor.black.withAlphaComponent(0.82).cgColor)
-            let centerCard = CGPath(roundedRect: CGRect(x: 5.4, y: 2.0, width: 7.2, height: 6.8), cornerWidth: 1.6, cornerHeight: 1.6, transform: nil)
+            // 2. Carte centrale nette (remplissage doux + contour propre)
+            ctx.setFillColor(NSColor.black.withAlphaComponent(0.85).cgColor)
+            let centerCard = CGPath(roundedRect: CGRect(x: 5.7, y: 2.0, width: 6.6, height: 6.0), cornerWidth: 1.4, cornerHeight: 1.4, transform: nil)
             ctx.addPath(centerCard)
             ctx.fillPath()
 
-            // 3. Berceau d'étagère en U arrondi devant (silhouette identique à front.svg)
+            // 3. Berceau d'étagère en U arrondi en bas (aéré avec un espace net de 1.8 pt)
             ctx.setFillColor(NSColor.black.cgColor)
             let tray = CGMutablePath()
-            tray.move(to: CGPoint(x: 3.0, y: 9.6))
-            tray.addLine(to: CGPoint(x: 5.7, y: 9.6))
+            tray.move(to: CGPoint(x: 2.9, y: 9.8))
+            tray.addLine(to: CGPoint(x: 5.8, y: 9.8))
             tray.addCurve(
                 to: CGPoint(x: 9.0, y: 12.1),
-                control1: CGPoint(x: 6.6, y: 9.6),
+                control1: CGPoint(x: 6.6, y: 9.8),
                 control2: CGPoint(x: 7.4, y: 12.1)
             )
             tray.addCurve(
-                to: CGPoint(x: 12.3, y: 9.6),
+                to: CGPoint(x: 12.2, y: 9.8),
                 control1: CGPoint(x: 10.6, y: 12.1),
-                control2: CGPoint(x: 11.4, y: 9.6)
+                control2: CGPoint(x: 11.4, y: 9.8)
             )
-            tray.addLine(to: CGPoint(x: 15.0, y: 9.6))
-            tray.addQuadCurve(to: CGPoint(x: 16.0, y: 10.6), control: CGPoint(x: 16.0, y: 9.6))
-            tray.addLine(to: CGPoint(x: 16.0, y: 13.4))
-            tray.addQuadCurve(to: CGPoint(x: 13.4, y: 16.0), control: CGPoint(x: 16.0, y: 16.0))
-            tray.addLine(to: CGPoint(x: 4.6, y: 16.0))
-            tray.addQuadCurve(to: CGPoint(x: 2.0, y: 13.4), control: CGPoint(x: 2.0, y: 16.0))
-            tray.addLine(to: CGPoint(x: 2.0, y: 10.6))
-            tray.addQuadCurve(to: CGPoint(x: 3.0, y: 9.6), control: CGPoint(x: 2.0, y: 9.6))
+            tray.addLine(to: CGPoint(x: 15.1, y: 9.8))
+            tray.addQuadCurve(to: CGPoint(x: 16.0, y: 10.7), control: CGPoint(x: 16.0, y: 9.8))
+            tray.addLine(to: CGPoint(x: 16.0, y: 13.6))
+            tray.addQuadCurve(to: CGPoint(x: 13.6, y: 16.0), control: CGPoint(x: 16.0, y: 16.0))
+            tray.addLine(to: CGPoint(x: 4.4, y: 16.0))
+            tray.addQuadCurve(to: CGPoint(x: 2.0, y: 13.6), control: CGPoint(x: 2.0, y: 16.0))
+            tray.addLine(to: CGPoint(x: 2.0, y: 10.7))
+            tray.addQuadCurve(to: CGPoint(x: 2.9, y: 9.8), control: CGPoint(x: 2.0, y: 9.8))
             tray.closeSubpath()
             ctx.addPath(tray)
             ctx.fillPath()
