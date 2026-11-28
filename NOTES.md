@@ -1,32 +1,36 @@
-# NOTES — Shake'n'Drop (ex-Webodrop, macOS Swift 6 Natif)
+# NOTES — Shake'n'Drop (macOS Swift 6 Natif)
 
-- **Statut :** ✅ V1 fonctionnelle, compilée en Release, testée, installée dans `/Applications/Shake'n'Drop.app` et épinglée au Dock.
-- **Stack :** Swift 6.4 (strict concurrency, `defaultIsolation(MainActor.self)`), SwiftUI, AppKit (`NSPanel`, `NSStatusItem`, `NSDraggingSource`/`Destination`), Carbon (`RegisterEventHotKey`), QuickLook (`QLPreviewPanel` + `QLThumbnailGenerator`).
-- **Brief :** [`docs/BRIEF.md`](docs/BRIEF.md)
+## PHASE 1: ÉTAT ACTUEL & CONTEXTE OPÉRATIONNEL (VIVANT)
+- **Statut :** ✅ **v1.0.20** publiée sur GitHub Releases (`https://github.com/DjapsSparrow/shake-n-drop/releases/latest`)
+- **Repo & Pages :** `DjapsSparrow/shake-n-drop` | Formulaire feedback live : `https://djapssparrow.github.io/shake-n-drop/feedback.html`
+- **Stack :** Swift 6.4 (`defaultIsolation(MainActor.self)`), SwiftUI, AppKit, Carbon HotKey, QuickLook, WebKit (`WKWebView`). Compatible **macOS 14.0+**.
+- **Brief :** [`docs/BRIEF.md`](docs/BRIEF.md) | **Backlog :** [`docs/task.md`](docs/task.md) | **Journal :** [`docs/journal/INDEX.md`](docs/journal/INDEX.md)
 
-## Fonctionnalités V1 livrées
-- **Déclencheurs :**
-  - *Shake-to-trigger* : `ShakeMonitor` + `ShakeDetector` (sensibilité Basse/Normale/Élevée, cooldown anti-rebond).
-  - *Raccourci global* : `⌥⇧D` par défaut (Carbon `RegisterEventHotKey`, zéro permission, presets dans Réglages).
-  - *Barre de menu* : `NSStatusItem` avec compteur d'éléments, menu natif ET zone de drop directe sur l'icône.
-  - *Schéma URL* : `webodrop://action/new-shelf`, `webodrop://action/close-all`, `webodrop://action/settings`.
-- **Étagères flottantes (`ShelfPanel` / `ShelfView`) :**
-  - Multi-étagères *always-on-top* non-activantes, déplaçables via `performDrag(with:)`, visibles sur tous les Spaces, design Liquid Glass natif Light/Dark.
-  - Auto-fermeture des étagères vides (non épinglées) au clic extérieur ou fin de drag sans dépôt + repli auto de la liste en pile au clic extérieur.
-  - Aimantation / repli sur les bords gauche & droit de l'écran en languette discrète (ressort au survol ou au drag) + masquer/afficher toutes les étagères depuis la barre de menu.
-  - Drag-in universel : fichiers, dossiers, images en mémoire, URLs web (`.webloc`), extraits de texte (`.txt`).
-  - Mode Pile (Stack avec vignettes inclinées + badge) et Mode Liste étendue.
-  - Drag-out groupé (toute la pile d'un coup via `NSDraggingSession`) ou individuel + auto-fermeture après dépôt (sauf si épinglée).
-- **Mises à jour automatiques (`UpdateChecker`) :** Vérification via GitHub Releases (`DjapsSparrow/shake-n-drop`), téléchargement & remplacement automatique, script `./tools/release.sh <version> "<notes>"`.
-- **Actions intégrées :** Quick Look (`Espace` ou clic), Partage natif (`NSSharingServicePicker` : AirDrop/Mail/Messages), Compression ZIP (`/usr/bin/ditto`), Copier, Révéler dans le Finder.
+### Architecture & Fonctionnalités actives
+- **Déclencheurs (0 permission système requise) :**
+  - *Shake-to-trigger* : `ShakeMonitor` + `ShakeDetector` filtré sur vrai drag (`NSPasteboard(name: .drag)`), ignore les déplacements de fenêtres.
+  - *Raccourci global* : `⌥⇧D` (Carbon `RegisterEventHotKey`, presets dans Réglages).
+  - *Barre de menu* : `NSStatusItem` (picto 18×18 *Curseur qui vibre*), drop direct sur l'icône, menu épuré avec SF Symbols alignés.
+- **Étagères flottantes (`ShelfPanel` / `ShelfView` / `ShelfDragBridge`) :**
+  - Déplaçables via `performDrag(with:)`, auto-fermeture des étagères vides au clic extérieur, repli auto de la liste en pile.
+  - Bouton intelligent `⇤`/`⇥` dans l'en-tête pour ranger en languette Liquid Glass `40×96` sur le bord le plus proche (survol pour déployer, clic pour détacher).
+  - Support complet fichiers, dossiers, images, textes et URLs `.webloc` (titre de page + favicon + ouverture au clic).
+  - Quick Look (`Espace`), AirDrop/Partage, ZIP (`/usr/bin/ditto`), Copier, Révéler Finder.
+- **Distribution & Support :**
+  - Auto-updater GitHub Releases (`UpdateChecker` + `UpdatePromptView` + `ChangelogView`).
+  - Parcours d'installation 2 étapes intégré (`OnboardingView` : copie `/Applications` + Dock).
+  - Formulaire Idée / Bug intégré (`FeedbackView` + `docs/feedback.html` via Web3Forms → `support@webomatik.fr`).
+  - Release 1-commande : `./tools/release.sh <version> "<notes>" [--no-install]`.
 
-## Validation
-- `swift test` : 5/5 tests passés (`WebodropKitTests`).
-- `./build.sh` : Release arm64 compilé sans warning, installé dans `~/Applications/Webodrop.app`.
+### 🚫 Arbitrages & Pistes Écartées (Ne pas reproposer)
+- **Pas de fichier "Lisez-moi" dans le DMG** → tout le parcours d'installation est intégré dans l'app.
+- **Pas d'aimantation automatique au drag sur les bords** → conflit avec macOS Window Tiling ; utiliser le bouton `⇤`/`⇥`.
+- **Pas de demande d'Accessibilité** → le Shake souris natif fonctionne sans aucune permission.
+- **Pas de dropzone ouverte au reboot / après MAJ** → démarrage discret en barre de menu.
+- **Pas de version localement écrasée lors des releases de test** → utiliser `--no-install` pour tester l'auto-updater.
+- **Pas de version Windows pour l'instant** → en attente d'un testeur Windows.
+
+### Validation
+- `swift test` : 6/6 passés (`WebodropKitTests`).
 - `--selftest` : 6/6 checks PASS.
-- `APP_SNAPSHOT` : 6 captures Light & Dark vérifiées visuellement.
-
-## Prochaines pistes (V2)
-- Certificat Apple Development pour conserver la permission Accessibilité entre les rebuilds.
-- Upload Cloud (Infomaniak S3 / lien public direct).
-- Zone Encoche (Notch) & actions rapides locales (conversion d'images, OCR Vision).
+- GitHub Releases : `v1.0.20` (`ShakeNDrop.dmg` + `ShakeNDrop.zip`) en ligne.
