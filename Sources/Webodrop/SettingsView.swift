@@ -94,9 +94,6 @@ struct SettingsView: View {
                         engine.openFeedback(initialKind: .bug)
                     }
                 }
-                Text("Ouvre le formulaire intégré et envoie votre retour à \(FeedbackHelper.supportEmail).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
